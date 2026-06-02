@@ -92,9 +92,9 @@ const ENTITY_EXTRACTION_RULES: NormalizedEntityRule[] = [
   // ── Place ──
   { name: '家', type: 'place', patterns: ['家'] },
   { name: '公司', type: 'place', patterns: ['公司', '办公室'] },
-  { name: '学校', type: 'place', patterns: ['学校', '大学'] },
-  { name: '北京', type: 'place', patterns: ['北京'] },
-  { name: '上海', type: 'place', patterns: ['上海'] },
+  { name: "北京", type: "place", patterns: ["北京"] },
+  { name: "上海", type: "place", patterns: ["上海"] },
+  { name: "深圳", type: "place", patterns: ["深圳"] },
 
   // ── Object ──
   { name: '礼物', type: 'object', patterns: ['礼物'] },

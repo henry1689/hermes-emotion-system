@@ -9,7 +9,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "sandbox": "npx tsx src/cli/sandbox.ts",
-    "stress-test": "npx tsx test/hermes-stress-tester.ts"
+    "stress-test": "npx tsx test/run-all-stress.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
