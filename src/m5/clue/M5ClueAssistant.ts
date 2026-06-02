@@ -57,7 +57,7 @@ export interface ClueQuestionResult {
  * 判断用户输入是否为模糊查询
  */
 function isVagueQuery(text: string): boolean {
-  return /那个|上次|某家|某次|之前|以前|有个/.test(text);
+  return /那个|上次|那家|那次|那晚|某家|某次|之前|以前|有个/.test(text);
 }
 
 /**
@@ -196,7 +196,7 @@ export class M5ClueAssistant {
   private generateFollowUp(userText: string): string {
     if (/猫|狗|橘猫/.test(userText)) return '那是有大海景的那家吗？';
     if (/咖啡|窗|书/.test(userText)) return '是在巷子里的那家吗？';
-    return '嗯…那我再想想，还有别的线索吗？';
+    return '嗯…还有别的线索吗？';
   }
 
   /**
