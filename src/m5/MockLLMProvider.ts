@@ -8,8 +8,10 @@
 // 4. 输出经过 ContextualSafetyGateway（非一刀切过滤）
 
 import type { LLMProvider, StrategyConfig, CognitionObject } from './types/index.js';
-import { renderIntimate, renderLongIntimate } from './expression/IntimateRenderer.js';
-import { getPhrase, getPhrases } from './expression/IntimateLexicon.js';
+import { renderIntimateResponse, renderLongIntimate } from './expression/IntimateRenderer.js';
+import type { IntimateSceneType } from './expression/IntimateRenderer.js';
+import { getPhrase, getPhrases, buildSensoryPassage } from './expression/IntimateLexicon.js';
+import type { SensoryDim } from './expression/IntimateLexicon.js';
 import { safetyCheck, defaultSafetyConfig } from './expression/ContextualSafetyGateway.js';
 import type { SafetyConfig } from './expression/ContextualSafetyGateway.js';
 import { injectThinkingPause } from './expression/ThinkingPauseInjector.js';
@@ -50,9 +52,10 @@ export class MockLLMProvider implements LLMProvider {
       const isClimax = /高潮|丢了|到了|去了|射/.test(txt) || s.ecstasy > 0.2;
 
       // 高强度 → 长回应（300-500字）
-      if (maxIntimate > 0.6 || isIntimateRecall) {
-        const scene = isAftercare ? 'aftercare' : isClimax ? 'climax' : 'thrust';
-        let text = renderLongIntimate(maxIntimate, scene as any);
+      if (maxIntimate > 0.3 || isIntimateRecall) {
+        const scene = isAftercare ? "aftercare" : isClimax ? "climax" : "thrust";
+        const ul = maxIntimate > 0.7 ? 3 : maxIntimate > 0.4 ? 2 : 1;
+        let text = renderLongIntimate(maxIntimate, scene, ul);
 
         // 安全检查
         const checked = safetyCheck(text, 2, this.safetyConfig);
