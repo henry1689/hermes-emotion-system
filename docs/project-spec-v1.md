@@ -1,7 +1,7 @@
 # 情感伴侣类脑认知系统 · 项目总设计规格书 v1.1
 
 > **文档状态**: Final — 已签署（含架构纠偏修正）  
-> **版本**: v1.1-final  
+> **版本**: v1.2-final  
 > **最后更新**: 2026-06-02  
 > **对应白皮书**: `ARCHITECTURE.md` v1.0  
 > **对应设计宣言**: `DESIGN_MANIFESTO.md` v1.0  
@@ -16,6 +16,7 @@
 | 2026-06-02 | v1.0-draft | 初稿（M1确权 + M2约束 + M3~M8占位） | Claude Code |
 | 2026-06-02 | v1.0-final | 正式签署。5项待决事项决议关闭，ADR-001~005 归档 | Claude Code |
 | 2026-06-02 | **v1.1-final** | **架构纠偏修正：新增 §1.6 本体-标签分离原则；emotion_vector → emotion_color（色号格式）；ADR-006 归档** | **Claude Code** |
+| 2026-06-02 | **v1.2-final** | **架构纠偏修正：PerceptionAnalyzer 从 M1 迁至 M3（24维感知是M3逻辑层的眼睛，不是M1编码层的手）；删除 M1 中错误的 §3.2.7；ADR 更新** | **Claude Code** |
 
 ---
 
@@ -385,27 +386,6 @@ flush 时:
 3. 对话结束后调用 `flush()` 获取最后一段的 DNA
 4. 新会话开始时调用 `resetSession()`
 
-#### 3.2.7 PerceptionAnalyzer — 24维感知分析器（M3输入契约）
-
-**职责**: 将 M1 原始 DNA 增强为 EnhancedDNA（含 24 维语义感知 + 钙质强度），作为 M3 逻辑决策层的输入契约。
-
-**核心架构**: 4 大象限 × 6 维度 = 24 维感知坐标系
-
-| 象限 | 维度 | 目的 |
-| :--- | :--- | :--- |
-| **情绪效价与能量** (E1~E6) | pleasure, arousal, dominance, aggression, sincerity, humor | 这段话是积极的还是消极的？能量是高亢还是低沉？ |
-| **认知逻辑与结构** (C1~C6) | factual, logical, certainty, abstract, temporal_focus, self_ref | 逻辑严密吗？在描述事实还是构建幻想？ |
-| **社会交互与关系** (S1~S6) | intimacy, power_diff, dependency, moral_judgment, etiquette, belonging | 想亲近还是推开？社会等级位置？ |
-| **亲密与欲望** (I1~I6) | sexual_attraction, sensory_craving, energy_merge, possessiveness, ecstasy, safety | 伴侣核心私密频道。从身体和能量层面深度交融。 |
-
-**钙质协议**: 决定 M3 的处理深度
-- `CS = Base_Core + Emotional_Boost + Threat_Bonus`
-- 强度分级: 粉末(0~0.3) / 液体(0.3~0.6) / 固体(0.6~0.8) / 晶体(0.8~1.0)
-
-**实现**: 纯规则驱动（关键词匹配 + 逻辑判断），不调用任何 LLM/ML 模型。独立模块，只负责计算不负责存储。
-
-Ref: 24维语义感知与钙质强度定义规范
-
 ### 3.3 接口契约
 
 **DNA TS 接口**:
@@ -465,7 +445,7 @@ interface EntityGene {
 | 3 | L3 entity_genes 标注依赖外部NLP | 实现为纯规则NER | 遵守"编码阶段零LLM"的铁律 | 否——增强 |
 | 4 | 未明确语义边界检测层 | 在M1中新增 SemanticBoundaryDetector | v1.3 架构决策补充 | 否——增强 |
 | 5 | self_model 作为编码参数传入 | 改为构造函数注入，全局共享 | 简化调用链，确保自我一致性 | 否——优化 |
-| 6 | 白皮书未定义感知分析层 | 新增 PerceptionAnalyzer（24维规则评分 + 钙质公式） | 24维语义感知与钙质强度定义规范 — M3输入契约 | 否——增强 |
+| 6 | 24维感知分析层归属 | ⚠️ 曾错误归入 M1，已修正为 M3 组件 | PerceptionAnalyzer 是 M3 逻辑层的"眼睛"，不在编码阶段执行。架构纠偏：迁出 M1 | 否——架构修正 |
 
 ---
 
@@ -560,7 +540,7 @@ interface StorageAdapter {
 | :--- | :--- | :--- | :--- |
 | `ERR_ENCODE_001` | M1 | 空输入 | 走 misc 兜底，不抛出异常 |
 | `ERR_ENCODE_002` | M1 | self_model 未传入 | 编译时捕获（TS类型），运行时不做校验 |
-| `ERR_PERCEPTION_001` | PerceptionAnalyzer | 输入DNA为空 | 返回全零感知的低钙质增强DNA |
+| `ERR_PERCEPTION_001` | M3 | 输入DNA为空 | 返回全零感知的低钙质增强DNA |
 | 【待扩展】 | M2 | — | M2 开发时补充 |
 | 【待扩展】 | M3 | — | M3 开发时补充 |
 
