@@ -15,6 +15,11 @@ export class CognitionAssembler {
     else if (p.pleasure < -0.3) emotionSummary = '表达了负面情绪';
     if (p.aggression > 0.5) emotionSummary += '，带有明显攻击性';
     if (p.humor > 0.5) emotionSummary += '，带有幽默感';
+    if (p.intimacy > 0.3) emotionSummary += '，带有亲密感';
+    if (p.sexual_attraction > 0.3) emotionSummary += '，带有吸引力';
+    if (p.sensory_craving > 0.3) emotionSummary += '，带有肢体渴望';
+    if (p.energy_merge > 0.3) emotionSummary += '，带有心灵交融感';
+    if (p.ecstasy > 0.3) emotionSummary += '，带有极致愉悦';
 
     // 构建历史摘要
     const hasHistory = m4ctx.memory_summary.timeline.length > 0;

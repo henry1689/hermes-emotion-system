@@ -105,6 +105,7 @@ const ABSTRACT_WORDS = new Set([
 const TEMPORAL_PAST = new Set([
   '以前', '曾经', '那时', '那年', '过去', '回忆', '往事',
   '怀旧', '后悔', '当初', '原来',
+  '记得', '那次', '那次', '曾经', '那时候', '想起来',
 ]);
 
 const TEMPORAL_FUTURE = new Set([
@@ -115,6 +116,8 @@ const TEMPORAL_FUTURE = new Set([
 const INTIMACY_WORDS = new Set([
   '悄悄话', '秘密', '只告诉你', '心里话', '最私密',
   '昵称', '宝贝', '亲爱的', '想你了',
+  '贝壳', '挂件', '信物', '肩膀', '靠在我', '窝在',
+  '搂着', '相拥', '依偎', '搂紧', '怀里',
 ]);
 
 const DEPENDENCY_WORDS = new Set([
@@ -138,16 +141,22 @@ const ETIQUETTE_WORDS = new Set([
 const SEXUAL_ATTRACTION = new Set([
   '性感', '迷人', '身材', '嘴唇', '眼睛', '触摸',
   '诱惑', '欲望', '想要你', '占有你',
+  '呼吸急促', '喘息', '颤抖', '柔软', '肌肤', '体温',
+  '胸口', '炽热', '燃烧',
 ]);
 
 const SENSORY_CRAVING = new Set([
   '拥抱', '抱抱', '亲吻', '吻', '抚摸', '牵手',
   '靠近', '贴贴', '需要你',
+  '搂紧', '呼吸', '头发', '洗发水', '体温', '蹭了蹭',
+  '揽着', '依偎', '碰触',
 ]);
 
 const ENERGY_MERGE = new Set([
   '心灵相通', '默契', '灵魂伴侣', '知己', '心意相通',
   '融合', '合一', '同频', '共振',
+  '那一刻', '世界只剩', '无比美好', '自然',
+  '有你真好', '感动', '浪漫', '温馨',
 ]);
 
 const POSSESSIVENESS = new Set([
