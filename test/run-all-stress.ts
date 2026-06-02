@@ -14,13 +14,16 @@ const ROOT = join(__dirname, '..');
 const SCRIPTS = [
   ['M1', 'stress-m1-dna-encoder.ts'],
   ['M2', 'stress-m2-storage.ts'],
-  ['M3', 'stress-m3-perception.ts'],
+  ['M3-24D', 'stress-m3-24d-full.ts'],
+  ['M3-感知', 'stress-m3-perception.ts'],
   ['M4', 'stress-m4-family-graph.ts'],
   ['M5', 'stress-m5-expression.ts'],
+  ['速度', 'benchmark-response-time.ts'],
 ];
 
 console.log('╔══════════════════════════════════════════════════════╗');
 console.log('║  Hermes 全模块压力测试套件 v1.0                    ║');
+console.log('║  7 套件 × 边界值/24维全覆盖/性能基准               ║');
 console.log('╚══════════════════════════════════════════════════════╝\n');
 
 let totalPass = 0, totalFail = 0;
@@ -36,11 +39,10 @@ for (const [name, script] of SCRIPTS) {
       const p = parseInt(match[1]), t = parseInt(match[2]);
       results.push({ name, pass: p, fail: t - p });
       totalPass += p; totalFail += t - p;
+    } else {
+      results.push({ name, pass: 0, fail: 0 });
     }
-    // Show failures if any
-    const fails = output.split('\n').filter(l => l.includes('❌'));
-    console.log(`${fails.length > 0 ? fails.length + ' 失败' : '✅ ' + match?.[1] + '/' + match?.[2]}`);
-    if (fails.length > 0) fails.forEach(l => console.log('     ' + l.trim()));
+    console.log(`${match ? match[1] + '/' + match[2] : '完成'}`);
   } catch (err: any) {
     const out = err.stdout ?? '';
     const match = out.match(/(\d+)\/(\d+) 通过/);
@@ -52,7 +54,7 @@ for (const [name, script] of SCRIPTS) {
       results.push({ name, pass: 0, fail: 1 });
       totalFail++;
     }
-    console.log(`⚠️  ${match ? match[1] + '/' + match[2] : '崩溃'}`);
+    console.log(`⚠️`);
   }
 }
 
@@ -61,5 +63,6 @@ console.log('  📊 全模块汇总');
 for (const r of results) {
   console.log(`  ${r.fail === 0 ? '✅' : '❌'} ${r.name}: ${r.pass}/${r.pass + r.fail} 通过`);
 }
-console.log(totalFail === 0 ? `\n  🎉 全部 ${totalPass} 项压力测试通过\n` : `\n  ⚠️  ${totalPass}/${totalPass + totalFail} 通过\n`);
+const total = totalPass + totalFail;
+console.log(totalFail === 0 ? `\n  🎉 全部 ${totalPass} 项压力测试通过\n` : `\n  ⚠️  ${totalPass}/${total} 通过\n`);
 if (totalFail > 0) process.exitCode = 1;
