@@ -5,6 +5,14 @@ import { DreamQueue } from './DreamQueue.js';
 import { DreamInternalizer } from './DreamInternalizer.js';
 import { ClueTracker } from './ClueTracker.js';
 import type { M8Engine } from '../m8/M8Engine.js';
+export function startM7Interval(m7: M7Orchestrator, intervalMs: number = 60000): NodeJS.Timeout {
+  return setInterval(async () => {
+    if (m7.queue.shouldProcess()) {
+      const result = await m7.processIdle();
+      console.log(`[M7] 梦境批处理: ${result.internalized} 条`);
+    }
+  }, intervalMs);
+}
 
 export class M7Orchestrator {
   public queue: DreamQueue;

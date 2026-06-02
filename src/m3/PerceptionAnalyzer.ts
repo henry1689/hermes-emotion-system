@@ -19,6 +19,9 @@
 // 不被 M1 调用，不在编码阶段执行
 
 import type { DNA, EntityGene } from '../m1/types/dna.js';
+import { loadSet } from '../m1/LexiconLoader.js';
+const hitCounters = new Map<string, number>();
+export function getHitReport(): Record<string,number> { return Object.fromEntries(hitCounters); }
 import type {
   Perception24D,
   EnhancedDNA,
@@ -31,156 +34,58 @@ import type {
 // 第一层：情感极性词表
 // ════════════════════════════════════════════════════════
 
-const POSITIVE_WORDS = new Set([
-  '开心', '快乐', '幸福', '感动', '兴奋', '满足', '温暖',
-  '甜蜜', '美好', '爱', '喜欢', '棒', '成功', '顺利',
-  '感恩', '感谢', '珍惜', '赞', '优秀', '厉害',
-  '满意', '舒适', '安心', '放松', '喜悦', '升职', '加薪', '好消息',
-]);
+const POSITIVE_WORDS = loadSet('emotion_lexicon.json', 'positive_words');
 
-const NEGATIVE_WORDS = new Set([
-  '难过', '伤心', '痛苦', '绝望', '焦虑', '抑郁', '孤独',
-  '失落', '崩溃', '无助', '生气', '愤怒', '烦躁', '郁闷',
-  '讨厌', '恶心', '害怕', '恐惧', '紧张', '不安',
-  '累', '难', '差', '糟', '失败', '压力', '折磨', '担心',
-  'ICU', '癌症', '生病', '住院', '手术', '病危', '急救',
-  '加班', '熬夜', '疲惫', '撑不住', '迷茫', '辛苦',
-  '烦', '睡不着', '失眠', '难受', '疼痛', '失望', '心情', '在乎', '受够了', '自私', '不想', '不再', '女同事', '同事', '吃醋', '不相信', '冷静', '吵架', '对不起', '无理取闹', '冷静一下', '不该', '你不信', '你不相信我', '什么关系都没有', '普通朋友', '只是同事', '没别的',
-]);
+const NEGATIVE_WORDS = loadSet('emotion_lexicon.json', 'negative_words');
 
-const HIGH_AROUSAL_WORDS = new Set([
-  '崩溃', '绝望', '愤怒', '狂喜', '震惊', '吓死', '兴奋极了',
-  '气死', '爱死', '受不了', '抓狂', '疯掉',
-  '颤抖', '颤栗', '战栗', '呼吸急促', '喘息', '呻吟', '叫', '叫出来', '喊出来', '忍住',
-  '剧烈', '强烈', '紧紧', '压抑', '轻吟', '忍不住', '心跳', '加速',
-]);
+const HIGH_AROUSAL_WORDS = loadSet('emotion_lexicon.json', 'high_arousal');
 
-const LOW_AROUSAL_WORDS = new Set([
-  '平静', '放松', '安静', '困', '累', '疲倦', '淡然',
-  '无所谓', '随便', '随意',
-]);
+const LOW_AROUSAL_WORDS = loadSet('emotion_lexicon.json', 'low_arousal');
 
-const DOMINANT_WORDS = new Set([
-  '必须', '一定', '绝对', '肯定', '要你', '给我', '命令',
-  '要求', '我说了算', '听我的', '我决定',
-]);
+const DOMINANT_WORDS = loadSet('emotion_lexicon.json', 'dominant');
 
-const SUBMISSIVE_WORDS = new Set([
-  '求求你', '帮帮我', '听你的', '随便你', '你做主', '我不行',
-  '没办法', '无力', '无可奈何', '只能',
-]);
+const SUBMISSIVE_WORDS = loadSet('emotion_lexicon.json', 'submissive');
 
-const AGGRESSION_WORDS = new Set([
-  '去死', '滚', '杀了', '打你', '揍你', '废了你', '恨', '恨你', '憎恨', '讨厌你', '恶心',
-  '混蛋', '垃圾', '废物', '蠢', '傻逼',
-]);
+const AGGRESSION_WORDS = loadSet('emotion_lexicon.json', 'aggression');
 
-const SINCERITY_WORDS = new Set([
-  '说实话', '真的', '其实', '心里话', '坦诚', '老实说',
-  '欺骗', '说谎', '虚伪', '假装', '装',
-]);
+const SINCERITY_WORDS = loadSet('emotion_lexicon.json', 'sincerity');
 
-const HUMOR_WORDS = new Set([
-  '哈哈', '呵呵', '玩笑', '开玩笑', '搞笑', '好笑',
-  '逗你', '幽默',
-]);
+const HUMOR_WORDS = loadSet('emotion_lexicon.json', 'humor');
 
-const CERTAIN_WORDS = new Set([
-  '一定', '绝对', '肯定', '必然', '毫无疑问', '坚信', '确信',
-]);
+const CERTAIN_WORDS = loadSet('emotion_lexicon.json', 'certain');
 
-const HEDGE_WORDS = new Set([
-  '可能', '大概', '也许', '或许', '好像', '似乎', '不一定',
-  '说不定', '猜测', '估计',
-]);
+const HEDGE_WORDS = loadSet('emotion_lexicon.json', 'hedge');
 
-const LOGICAL_WORDS = new Set([
-  '因为', '所以', '因此', '既然', '如果', '那么', '但是',
-  '然而', '虽然', '不过', '而且', '并且',
-]);
+const LOGICAL_WORDS = loadSet('emotion_lexicon.json', 'logical');
 
-const ABSTRACT_WORDS = new Set([
-  '人生', '命运', '意义', '哲学', '道理', '本质', '真理',
-  '灵魂', '意识', '宇宙', '存在',
-]);
+const ABSTRACT_WORDS = loadSet('emotion_lexicon.json', 'abstract');
 
-const TEMPORAL_PAST = new Set([
-  '以前', '曾经', '那时', '那年', '过去', '回忆', '往事',
-  '怀旧', '后悔', '当初', '原来',
-  '记得', '那次', '那次', '曾经', '那时候', '想起来',
-]);
+const TEMPORAL_PAST = loadSet('emotion_lexicon.json', 'temporal_past');
 
-const TEMPORAL_FUTURE = new Set([
-  '以后', '将来', '未来', '打算', '计划', '希望', '憧憬',
-  '梦想', '目标', '即将', '明天',
-]);
+const TEMPORAL_FUTURE = loadSet('emotion_lexicon.json', 'temporal_future');
 
-const INTIMACY_WORDS = new Set([
-  '悄悄话', '秘密', '只告诉你', '心里话', '最私密',
-  '昵称', '宝贝', '亲爱的', '想你了', '想你',
-  '想你', '想你的', '想念', '怀念', '思念',
-  '贝壳', '挂件', '信物', '肩膀', '靠在我', '窝在',
-  '搂着', '相拥', '依偎', '搂紧', '怀里',
-]);
+const INTIMACY_WORDS = loadSet('emotion_lexicon.json', 'intimacy');
 
-const DEPENDENCY_WORDS = new Set([
-  '需要你', '离不开', '没有你', '抱你', '抱着', '从后面', '耳边', '说话',
-  '陪你', '等你', '在一起', '不分开',
-  '全部', '整个', '属于', '别走', '留下',
-  '想你', '想你了', '舍不得', '依赖', '依靠', '陪伴', '一起', '陪着我',
-  '想要你', '需要你',
-]);
+const DEPENDENCY_WORDS = loadSet('emotion_lexicon.json', 'dependency');
 
-const MORAL_POSITIVE = new Set([
-  '正义', '善良', '道德', '高尚', '伟大', '公正', '公平',
-]);
+const MORAL_POSITIVE = loadSet('emotion_lexicon.json', 'moral_positive');
 
-const MORAL_NEGATIVE = new Set([
-  '邪恶', '不公', '缺德', '卑鄙', '无耻', '恶心', '卑鄙',
-]);
+const MORAL_NEGATIVE = loadSet('emotion_lexicon.json', 'moral_negative');
 
-const ETIQUETTE_WORDS = new Set([
-  '谢谢', '感谢', '请', '对不起', '无理取闹', '冷静一下', '不该', '你不信', '你不相信我', '什么关系都没有', '普通朋友', '只是同事', '没别的', '抱歉', '不好意思',
-  '劳驾', '打扰', '麻烦你', '您好',
-]);
+const ETIQUETTE_WORDS = loadSet('emotion_lexicon.json', 'etiquette');
 
-const SEXUAL_ATTRACTION = new Set([
-  '性感', '迷人', '身材', '嘴唇', '眼睛', '触摸',
-  '诱惑', '欲望', '想要你', '占有你', '想把你', '压在', '压着', '推倒',
-  '蕾丝', '内衣', '丝袜', '裸', '脱掉', '解开',
-  '挑逗', '勾引', '诱人', '色', '骚', '浪', '颤抖', '发抖', '做爱', '缠绵', '身下', '那晚', '那一夜', '裙子', '好看', '牵手', '靠近', '香味', '等你', '吻', '脖子', '叫', '睡不着', '耳边', '抱你', '干', '高潮', '失控', '占有', '最深', '忘不了', '干你', '操你', '进到', '吸进去', '牵', '香', '真美', '等你', '味道', '好闻', '找你', '想听', '弄', '要你', '狠狠', '让你', '进到', '干到', '最深处', '融', '忘不了', '每次', '进入', '灵魂', '吸', '穿给你', '回来', '后面抱着', '在后面', '只能', '到死', '一部分', '这辈子', '我的', '你是我的', '你的', '属于我', '唯一', '爱', '做爱', '融为一体', '最深处', '整天', '一整天', '整天', '一晚上', '一整夜',
-  '呼吸急促', '喘息', '颤抖', '柔软', '肌肤', '体温',
-  '胸口', '炽热', '燃烧',
-]);
+const SEXUAL_ATTRACTION = loadSet('emotion_lexicon.json', 'sexual_attraction');
 
-const SENSORY_CRAVING = new Set([
-  '拥抱', '抱抱', '亲吻', '吻', '抚摸', '牵手',
-  '靠近', '贴贴', '需要你', '想碰', '想摸', '摸你',
-  '碰你', '握', '手心', '揉', '捏', '掐', '滑',
-  '软', '嫩', '湿', '热', '烫', '硬', '滑', '紧', '深', '浅', '肿', '红', '吻', '抚摸', '触摸', '碰触', '接触', '蹭', '摩擦', '握住', '握', '揉', '捏', '掐', '指甲', '划过',
-  '搂紧', '呼吸', '头发', '洗发水', '体温', '蹭了蹭',
-  '揽着', '依偎', '碰触',
-]);
+const SENSORY_CRAVING = loadSet('emotion_lexicon.json', 'sensory_craving');
 
-const ENERGY_MERGE = new Set([
-  '心灵相通', '默契', '灵魂伴侣', '知己', '心意相通',
-  '融合', '合一', '同频', '共振',
-  '那一刻', '世界只剩', '无比美好', '自然',
-  '有你真好', '感动', '浪漫', '温馨',
-  '交融', '共鸣', '灵魂', '融合', '合一', '同频', '共振',
-  '合二为一', '融为一体', '融为一体', '同步', '和谐',
-]);
+const ENERGY_MERGE = loadSet('emotion_lexicon.json', 'energy_merge');
 
 const POSSESSIVENESS = new Set([
   '我的', '属于我', '不许', '不准', '吃醋', '嫉妒',
   '只有我', '专属', '独占',
 ]);
 
-const ECSTASY_WORDS = new Set([
-  '极致', '完美', '最幸福', '太棒了', '无与伦比',
-  '天堂', '最美', '最快乐',
-  '高潮', '巅峰', '释放', '淹没', '极致快乐', '欢愉', '丢', '到了', '去了',
-]);
+const ECSTASY_WORDS = loadSet('emotion_lexicon.json', 'ecstasy');
 
 const SAFETY_WORDS = new Set([
   '放心', '安心', '信任', '相信你', '安全', '踏实',
@@ -197,6 +102,9 @@ const INSECURITY_WORDS = new Set([
 // ════════════════════════════════════════════════════════
 
 function countHits(text: string, wordSet: Set<string>): number {
+  const key = [...wordSet].slice(0,1).join('');
+  if (hitCounters.has(key)) hitCounters.set(key, hitCounters.get(key)! + 1);
+  else hitCounters.set(key, 1);
   let hits = 0;
   for (const word of wordSet) {
     if (text.includes(word)) hits++;

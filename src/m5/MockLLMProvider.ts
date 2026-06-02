@@ -148,12 +148,11 @@ export class MockLLMProvider implements LLMProvider {
     // 规则3: 检测用户脏话等级
     const hasLevel3 = /操死|干死|母狗|骚货|爸爸|爸爸操/.test(txt);
     const hasLevel2 = /操|干|日|插|顶/.test(txt);
-    const userDirtyLevel = hasLevel3 && i1 > 0.8 ? 3 : hasLevel2 && maxInt > 0.4 ? 2 : 0;
+    const userDirtyLevel = hasLevel3 && i1 > 0.8 && s.aggression < 0.5 ? 3 : hasLevel2 && maxInt > 0.4 ? 2 : 0;
 
-    // ═══ 亲密场景 ═══
-    if (isIntimate || tone === 'intimate' || userDirtyLevel > 0) {
       const isLow = maxInt < 0.4 && !intimateRecall;
       const isHigh = maxInt > 0.65 || intimateRecall || isClimax || userDirtyLevel >= 2;
+    if (isIntimate || tone === 'intimate' || userDirtyLevel > 0) {
 
       // 规则3: 脏话镜像
       if (userDirtyLevel === 3) {

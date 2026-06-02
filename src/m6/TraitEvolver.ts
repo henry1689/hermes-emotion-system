@@ -4,6 +4,14 @@
 import type { SelfModelTraits, EvolutionSignal, EvolutionDecision } from './types/index.js';
 import { SelfModelManager } from './SelfModelManager.js';
 
+const NORMALIZATION: Record<string, number> = {
+  openness: 0.5,
+  conscientiousness: 0.5,
+  extraversion: 0.4,
+  agreeableness: 0.3,
+  neuroticism: 0.3,
+};
+
 function clamp(v: number): number { return Math.max(0, Math.min(1, v)); }
 
 export class TraitEvolver {

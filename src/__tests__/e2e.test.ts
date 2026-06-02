@@ -20,7 +20,8 @@ const SELF_MODEL: SelfModelV1 = {
   narrative_identity: '测试自我',
 };
 
-const TEST_DIR = join(__dirname, '.e2e-tmp');
+import { randomUUID } from 'node:crypto';
+const TEST_DIR = join(__dirname, '.e2e-tmp-' + randomUUID());
 const TEST_DB = join(TEST_DIR, 'knowledge', 'family_graph.db');
 
 describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {

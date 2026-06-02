@@ -27,6 +27,7 @@ export class JsonYearRingAdapter implements M8Engine {
   private entries: YearRingEntry[] = [];
   private scars: ScarTag[] = [];
   private ringsPath: string;
+  private invertedIndex: Map<string, string[]> = new Map();
   private scarsPath: string;
 
   constructor(dirPath?: string) {
@@ -41,6 +42,18 @@ export class JsonYearRingAdapter implements M8Engine {
       if (fs.existsSync(this.ringsPath)) this.entries = JSON.parse(fs.readFileSync(this.ringsPath, 'utf-8'));
       if (fs.existsSync(this.scarsPath)) this.scars = JSON.parse(fs.readFileSync(this.scarsPath, 'utf-8'));
     } catch { this.entries = []; this.scars = []; }
+    this.buildIndex();
+  }
+
+  private buildIndex(): void {
+    this.invertedIndex.clear();
+    for (const entry of this.entries) {
+      for (const clue of entry.retrieval_clues) {
+        const key = clue.toLowerCase();
+        if (!this.invertedIndex.has(key)) this.invertedIndex.set(key, []);
+        this.invertedIndex.get(key)!.push(entry.id);
+      }
+    }
   }
 
   private save(): void {

@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { L0RouteResult, TaxonomyTree } from './types/dna.js';
+import { loadL0Rules } from './LexiconLoader.js';
 
 // ─── 当前文件所在目录 ───
 const __filename = fileURLToPath(import.meta.url);
@@ -40,32 +41,7 @@ interface KeywordRule {
   /** 权重优先级（数字越小优先级越高） */
   priority: number;
 }
-
-const KEYWORD_RULES: KeywordRule[] = [
-  // ── Family domain ──
-  { id: 'family-conflict-1', keywords: ['吵架', '争吵', '闹别扭', '冷战', '发脾气', '烦死了', '受不了'], domain: 'family', subcategory: 'conflict', priority: 1 },
-  { id: 'family-conflict-2', keywords: ['催婚', '唠叨', '啰嗦', '逼我', '骂我', '重男轻女'], domain: 'family', subcategory: 'conflict', priority: 2 },
-  { id: 'family-care-1', keywords: ['想家', '想念', '回家', '温暖', '爱你们', '感恩'], domain: 'family', subcategory: 'care', priority: 2 },
-  { id: 'family-care-2', keywords: ['妈妈', '妈', '父亲', '爸', '父母', '照顾', '关心', '健康'], domain: 'family', subcategory: 'care', priority: 3 },
-  { id: 'family-general-1', keywords: ['家庭', '家人', '亲戚', '家族', '家'], domain: 'family', subcategory: 'general', priority: 4 },
-
-  // ── Work domain ──
-  { id: 'work-stress-1', keywords: ['加班', '压力', '累死了', '辞职', '烦工作', '996', '内卷'], domain: 'work', subcategory: 'stress', priority: 1 },
-  { id: 'work-stress-2', keywords: ['老板', '上司', '同事', '客户', '甲方'], domain: 'work', subcategory: 'stress', priority: 3 },
-  { id: 'work-achievement-1', keywords: ['升职', '加薪', '项目成功', '完成', '通过', '录用', 'offer', '奖金'], domain: 'work', subcategory: 'achievement', priority: 2 },
-  { id: 'work-general-1', keywords: ['工作', '上班', '公司', '项目', '会议', '开会', '出差', '办公室'], domain: 'work', subcategory: 'general', priority: 4 },
-
-  // ── Emotion domain (negative) ──
-  { id: 'emotion-negative-1', keywords: ['难过', '伤心', '痛苦', '绝望', '焦虑', '抑郁', '孤独', '失落', '崩溃', '无助'], domain: 'emotion', subcategory: 'negative', priority: 1 },
-  { id: 'emotion-negative-2', keywords: ['生气', '愤怒', '不爽', '烦躁', '郁闷', '讨厌', '恶心', '烦'], domain: 'emotion', subcategory: 'negative', priority: 2 },
-  { id: 'emotion-negative-3', keywords: ['害怕', '恐惧', '担心', '紧张', '不安', '慌'], domain: 'emotion', subcategory: 'negative', priority: 2 },
-  { id: 'emotion-positive-1', keywords: ['开心', '幸福', '快乐', '兴奋', '感动', '满足', '甜蜜', '温暖', '美好'], domain: 'emotion', subcategory: 'positive', priority: 1 },
-  { id: 'emotion-positive-2', keywords: ['太好了', '真棒', '厉害', '成功', '喜欢', '爱'], domain: 'emotion', subcategory: 'positive', priority: 2 },
-  { id: 'emotion-neutral-1', keywords: ['觉得', '感觉', '心情', '情绪', '状态'], domain: 'emotion', subcategory: 'neutral', priority: 5 },
-
-  // ── 强制兜底（优先级最低，无需关键词）──
-  // misc.default handled in the router logic
-];
+const KEYWORD_RULES = loadL0Rules();
 
 /**
  * 加载认知分类树
