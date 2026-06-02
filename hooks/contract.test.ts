@@ -117,7 +117,7 @@ const M2_TEST_DIR = join(__dirname, '..', 'src', 'm2', '__tests__', '.hook-test-
 
 describe('[HOOK] M2 — 5区隔离', () => {
   it('写入5条不同区数据后各文件恰好1条', async () => {
-    if (!existsSync(M2_TEST_DIR)) mkdirSync(M2_TEST_DIR, { recursive: true });
+    if (existsSync(M2_TEST_DIR)) rmSync(M2_TEST_DIR, { recursive: true, force: true }); mkdirSync(M2_TEST_DIR, { recursive: true });
     const adapter = new JsonStorageAdapter(M2_TEST_DIR);
     await adapter.initialize();
 
@@ -147,7 +147,7 @@ describe('[HOOK] M2 — 5区隔离', () => {
 
 describe('[HOOK] M2 — 写入性能', () => {
   it('单条写入应在50ms内完成（JSON文件I/O含3次原子写入）', async () => {
-    if (!existsSync(M2_TEST_DIR)) mkdirSync(M2_TEST_DIR, { recursive: true });
+    if (existsSync(M2_TEST_DIR)) rmSync(M2_TEST_DIR, { recursive: true, force: true }); mkdirSync(M2_TEST_DIR, { recursive: true });
     const adapter = new JsonStorageAdapter(M2_TEST_DIR);
     await adapter.initialize();
 
