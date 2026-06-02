@@ -146,3 +146,60 @@ export interface EnhancedDNA {
   /** 预计算的强度等级 */
   calcium_level: CalciumLevel;
 }
+
+// ────────────────────────────────────────────────────────
+// 第四部分：M3 逻辑决策层类型
+// ────────────────────────────────────────────────────────
+
+/**
+ * M3 决策动作类型
+ *
+ * ignore    — 忽略（粉末级 0.0~0.3）：噪音废话，不浪费算力
+ * memorize  — 记忆（液体级 0.3~0.6）：正常交流，只需记录
+ * ask       — 追问（固体级 0.6~0.8）：话题值得深入，主动询问细节
+ * comfort   — 安慰（固体级 0.6~0.8）：检测到负面情绪，需要情感支持
+ * act       — 行动（晶体级 0.8~1.0）：重大事件或极致情感，触发核心响应
+ *
+ * Ref: M3-design-v1.md §2.3
+ */
+export type M3Action = 'ignore' | 'memorize' | 'ask' | 'comfort' | 'act';
+
+/**
+ * M3 决策上下文
+ *
+ * 包含当前时间、地点、历史决策等信息，影响感知分析和决策路由。
+ *
+ * Ref: M3-design-v1.md §2.4
+ */
+export interface M3Context {
+  /** 当前时间 ISO8601（默认从系统获取） */
+  current_time?: string;
+  /** 当前地点（从 L3 实体提取或外部传入） */
+  current_location?: string;
+  /** 最近的 M3 决策历史（用于连续性判断） */
+  recent_decisions?: M3Decision[];
+  /** 用户情感基线（用于异常检测） */
+  emotion_baseline?: {
+    avg_pleasure: number;
+    avg_arousal: number;
+  };
+}
+
+/**
+ * M3 决策结果
+ *
+ * M3LogicOrchestrator.decide() 的输出。
+ * 包含增强型 DNA、决策动作列表、决策理由。
+ *
+ * Ref: M3-design-v1.md §2.5
+ */
+export interface M3Decision {
+  /** 增强型 DNA（含 24维感知 + 钙质） */
+  enhanced: EnhancedDNA;
+  /** 决策动作列表（可多个，按优先级排序） */
+  actions: M3Action[];
+  /** 决策理由 */
+  reason: string;
+  /** 当前时间上下文 */
+  timestamp: string;
+}

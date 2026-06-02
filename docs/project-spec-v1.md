@@ -1,7 +1,7 @@
 # 情感伴侣类脑认知系统 · 项目总设计规格书 v1.1
 
 > **文档状态**: Final — 已签署（含架构纠偏修正）  
-> **版本**: v1.2-final  
+> **版本**: v1.3-final  
 > **最后更新**: 2026-06-02  
 > **对应白皮书**: `ARCHITECTURE.md` v1.0  
 > **对应设计宣言**: `DESIGN_MANIFESTO.md` v1.0  
@@ -16,7 +16,8 @@
 | 2026-06-02 | v1.0-draft | 初稿（M1确权 + M2约束 + M3~M8占位） | Claude Code |
 | 2026-06-02 | v1.0-final | 正式签署。5项待决事项决议关闭，ADR-001~005 归档 | Claude Code |
 | 2026-06-02 | **v1.1-final** | **架构纠偏修正：新增 §1.6 本体-标签分离原则；emotion_vector → emotion_color（色号格式）；ADR-006 归档** | **Claude Code** |
-| 2026-06-02 | **v1.2-final** | **架构纠偏修正：PerceptionAnalyzer 从 M1 迁至 M3（24维感知是M3逻辑层的眼睛，不是M1编码层的手）；删除 M1 中错误的 §3.2.7；ADR 更新** | **Claude Code** |
+| 2026-06-02 | **v1.2-final** | **架构纠偏修正：PerceptionAnalyzer 从 M1 迁至 M3；删除 M1 中错误的 §3.2.7；ADR 更新** | **Claude Code** |
+| 2026-06-02 | **v1.3-final** | **M3 逻辑决策与感知层完成：新增 §5 M3 章节；决策路由表 + 24维感知 + 钙质协议；123 测试全部通过** | **Claude Code** |
 
 ---
 
@@ -511,11 +512,64 @@ interface StorageAdapter {
 
 ---
 
-## 第5~9章 M3~M8 模块概览（占位符）
+## 第5章 M3 逻辑决策与感知层（已确权）
+
+### 5.1 职责定义
+
+| 项目 | 内容 |
+| :--- | :--- |
+| **模块全称** | 逻辑决策与感知层 |
+| **核心职责** | 接收 M1 的 DNA，计算 24 维感知向量 + 钙质强度，输出决策动作 |
+| **输入** | `DNA` + `M3Context`（时间/地点/基线） |
+| **输出** | `M3Decision`（含 EnhancedDNA + M3Action[] + 理由） |
+| **前置依赖** | M1 DNAEncoder + M2 JsonStorageAdapter |
+
+### 5.2 内部组件
+
+| 组件 | 职责 |
+| :--- | :--- |
+| **PerceptionAnalyzer** | 24维纯规则评分引擎 + 钙质公式计算 + 上下文注入 |
+| **M3LogicOrchestrator** | 感知→决策路由→动作输出的流水线编排 |
+
+### 5.3 决策路由表
+
+| 钙质等级 | 愉悦度 > 0.2 | 愉悦度 < -0.2 | 中性 |
+| :--- | :--- | :--- | :--- |
+| 粉末 (0) | ignore | ignore | ignore |
+| 液体 (1) | memorize | memorize | memorize |
+| 固体 (2) | ask | comfort | memorize + ask |
+| 晶体 (3) | act | act | act |
+
+### 5.4 核心接口
+
+```typescript
+// M3Action: ignore | memorize | ask | comfort | act
+// M3Context: { current_time?, current_location?, recent_decisions?, emotion_baseline? }
+// M3Decision: { enhanced: EnhancedDNA, actions: M3Action[], reason: string, timestamp: string }
+```
+
+### 5.5 关键架构约束
+
+- ❌ **不调用 LLM** — 24维计算是纯规则驱动
+- ❌ **不修改 DNA** — 感知结果是独立元数据
+- ❌ **不生成语言** — 那是 M5 的职责
+
+### 5.6 当前交付物
+
+| 文件 | 说明 |
+| :--- | :--- |
+| `src/m3/PerceptionAnalyzer.ts` | 24维评分 + 钙质公式 + injectContext |
+| `src/m3/M3LogicOrchestrator.ts` | 决策编排器（路由表 + 动作输出） |
+| `src/m3/types/perception.ts` | Perception24D / EnhancedDNA / M3Context / M3Decision |
+| `src/m3/__tests__/PerceptionAnalyzer.test.ts` | 24 个测试 |
+
+---
+
+## 第6~10章 M4~M8 模块概览（占位符）
 
 | 章节 | 模块 | 核心目标 | 前置依赖 | 已知约束 |
 | :--- | :--- | :--- | :--- | :--- |
-| **第5章** | **M3: DNA还原器** | 按 DNA 导航反向提取完整事件语义 | M1 + M2 | 全程零LLM，<100ms |
+| **第5章** | **M3: 逻辑决策与感知层** | 24维语义感知 + 钙质强度计算 + 决策路由（忽略/记忆/追问/安慰/行动） | M1 + M2 | 纯规则驱动，零LLM，含时间/地点上下文注入 |
 | **第6章** | **M4: 三源知识库查询与融合** | 按 entity_genes 的 knowledge_type 查询对应知识源 | M2 | 查询超时 >50ms 时只返回私人记忆 |
 | **第7章** | **M5: 逆向人文转译流水线** | 认知组装→策略选择→LLM受控生成→人文校准 | M3 + M4 | 认知组装纯函数，<20ms |
 | **第8章** | **M6: AI自我模型状态机** | 核心特质/偏好欲望/边界原则/叙事身份的演化 | M1~M5 | 冷启动出厂默认值；不允许一键重置 |

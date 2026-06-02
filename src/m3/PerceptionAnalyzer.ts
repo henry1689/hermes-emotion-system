@@ -18,12 +18,13 @@
 // 调用时间: M2 存储完成后 → M3LogicOrchestrator 调用此分析器
 // 不被 M1 调用，不在编码阶段执行
 
-import type { DNA } from '../m1/types/dna.js';
+import type { DNA, EntityGene } from '../m1/types/dna.js';
 import type {
   Perception24D,
   EnhancedDNA,
   CalciumResult,
   CalciumLevel,
+  M3Context,
 } from './types/perception.js';
 
 // ════════════════════════════════════════════════════════
@@ -524,6 +525,54 @@ export class PerceptionAnalyzer {
     return this.analyze(mockDNA);
   }
 
+  /**
+   * 注入决策上下文到增强型 DNA 中
+   *
+   * 根据 M3Context 中的时间、地点信息，修正感知维度。
+   *
+   * Ref: M3-design-v1.md §4.2
+   */
+  injectContext(enhanced: EnhancedDNA, context?: M3Context): void {
+    if (!context) return;
+
+    const text = enhanced.raw_input;
+
+    // 时效性规则：时间词修正 C5 temporal_focus
+    if (text.includes('今天') || text.includes('现在')) {
+      enhanced.perception.temporal_focus = Math.max(enhanced.perception.temporal_focus, 0.2);
+    }
+    if (text.includes('刚才') || text.includes('刚刚')) {
+      enhanced.perception.arousal = Math.min(enhanced.perception.arousal + 0.1, 1.0);
+    }
+    if (text.includes('明天') || text.includes('将来') || text.includes('以后')) {
+      enhanced.perception.temporal_focus = Math.max(enhanced.perception.temporal_focus, 0.3);
+    }
+    if (text.includes('以前') || text.includes('过去') || text.includes('曾经')) {
+      enhanced.perception.temporal_focus = Math.min(enhanced.perception.temporal_focus, -0.2);
+    }
+
+    // 地点感知规则：本地地点提升 S6 belonging
+    if (context.current_location) {
+      const hasLocalPlace = enhanced.entity_genes.some(
+        (e) => e.type === 'place' && e.name === context.current_location
+      );
+      if (hasLocalPlace) {
+        enhanced.perception.belonging = Math.min(enhanced.perception.belonging + 0.15, 1.0);
+        enhanced.perception.intimacy = Math.min(enhanced.perception.intimacy + 0.1, 1.0);
+      }
+    }
+
+    // 情感基线异常检测
+    if (context.emotion_baseline) {
+      const base = context.emotion_baseline;
+      const pDelta = Math.abs(enhanced.perception.pleasure - base.avg_pleasure);
+      const aDelta = Math.abs(enhanced.perception.arousal - base.avg_arousal);
+      if (pDelta > 0.5 || aDelta > 0.4) {
+        enhanced.perception.arousal = Math.min(enhanced.perception.arousal + 0.15, 1.0);
+      }
+    }
+  }
+
   /** 获取钙质强度的中文描述 */
   static describeLevel(level: CalciumLevel): string {
     switch (level) {
@@ -532,5 +581,10 @@ export class PerceptionAnalyzer {
       case 2: return '固体 — 记忆/回应';
       case 3: return '晶体 — 刻录/行动';
     }
+  }
+
+  /** 根据感知向量重新计算钙质强度（在 injectContext 后调用） */
+  static recalculateCalcium(perception: Perception24D): CalciumResult {
+    return calculateCalcium(perception);
   }
 }
