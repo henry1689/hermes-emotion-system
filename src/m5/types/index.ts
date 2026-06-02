@@ -20,6 +20,9 @@ export interface CognitionObject {
       energy_merge: number;
       possessiveness: number;
       ecstasy: number;
+      sincerity: number;
+      aggression: number;
+      dominance: number;
       safety: number;
     };
   };

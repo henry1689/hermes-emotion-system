@@ -1,6 +1,6 @@
 # M8 关系年轮与具身记忆引擎 · 设计文档
 
-> **文档状态**: Pre-Design Draft（待评审）  
+> **文档状态**: Final Design (Approved)  
 > **关联规格书**: `docs/project-spec-v1.md` §10（M8占位）  
 > **关联 ADR**: ADR-005（冷启动自我模型）  
 > **版本**: v0.1-design  

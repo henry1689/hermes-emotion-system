@@ -1,6 +1,6 @@
 # M6 AI自我模型状态机 · 设计文档
 
-> **文档状态**: Pre-Design Draft（待评审）  
+> **文档状态**: Final Design (Approved)  
 > **关联规格书**: `docs/project-spec-v1.md` §1.2（第3锚点）, §8（M6占位）  
 > **关联 ADR**: ADR-005（冷启动自我模型方案）  
 > **关联模块**: M7（梦境异步学习）、M8（关系年轮仲裁）  

@@ -65,6 +65,9 @@ export class CognitionAssembler {
           possessiveness: p.possessiveness,
           ecstasy: p.ecstasy,
           safety: p.safety,
+          sincerity: p.sincerity,
+          aggression: p.aggression,
+          dominance: p.dominance,
         },
       },
       history: {
