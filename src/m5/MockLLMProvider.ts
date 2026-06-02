@@ -43,7 +43,7 @@ export class MockLLMProvider implements LLMProvider {
     // 亲密场景检测
     const maxIntimate = Math.max(s.sexual_attraction, s.sensory_craving, s.energy_merge, s.ecstasy);
     const isIntimateRecall = rh && /高潮|进入|接吻|拥抱|亲吻|抚摸|胸口|赤裸|白衬衫|锁骨|当晚|那一夜|交融|颤抖|事后|相拥|腿软|身体|做爱|湿漉漉|呼吸急促|皮肤|指尖|体温|柔软|解开|扣子/.test(txt);
-    const isHighIntimate = maxIntimate > 0.4 || isIntimateRecall;
+    const isHighIntimate = maxIntimate > 0.2 || isIntimateRecall;
 
     // ─── 私密场景：使用直白表达引擎 ───
     if (isHighIntimate) {
@@ -52,9 +52,9 @@ export class MockLLMProvider implements LLMProvider {
       const isClimax = /高潮|丢了|到了|去了|射/.test(txt) || s.ecstasy > 0.2;
 
       // 高强度 → 长回应（300-500字）
-      if (maxIntimate > 0.3 || isIntimateRecall) {
+      if (maxIntimate > 0.2 || isIntimateRecall) {
         const scene = isAftercare ? "aftercare" : isClimax ? "climax" : "thrust";
-        const ul = maxIntimate > 0.7 ? 3 : maxIntimate > 0.4 ? 2 : 1;
+        const ul = maxIntimate > 0.65 ? 3 : maxIntimate > 0.4 ? 2 : 1;
         let text = renderLongIntimate(maxIntimate, scene, ul);
 
         // 安全检查
