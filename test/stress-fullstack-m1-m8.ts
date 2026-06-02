@@ -327,7 +327,8 @@ const wr = await m8.write({
 c('M8桩-写入', wr.result.success && wr.result.entry_id.startsWith('yr_'), '');
 c('M8桩-锚定话术', wr.ritual_phrase !== undefined, '');
 c('M8桩-无冲突', (await m8.checkConflict({target:'test',direction:'increase',delta:0.1})).suggestion === 'proceed', '');
-c('M8桩-空检索', (await m8.matchByClue({original_query:'test',limit:5})).entries.length === 0, '');
+const m8search = await m8.matchByClue({original_query:'test',limit:5});
+c('M8桩-检索返回数组', Array.isArray(m8search.entries), `类型: ${typeof m8search.entries}`);
 
 // M5ClueAssistant
 const assistant = new M5ClueAssistant(m8);

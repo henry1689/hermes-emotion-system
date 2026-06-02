@@ -100,7 +100,10 @@ check('长期未用权重≥0.1', longUnused >= 0.1, `got ${longUnused.toFixed(3
 console.log('\n━━━ M8 桩实现接口 ─━━');
 
 import { JsonYearRingAdapter } from '../src/m8/JsonYearRingAdapter.js';
-const adapter = new JsonYearRingAdapter();
+const TMP_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '.stress-m678-tmp');
+  const adapter = new JsonYearRingAdapter(join(TMP_DIR, 'm8'));
+  if (existsSync(TMP_DIR)) rmSync(TMP_DIR, {recursive:true, force:true});
+  mkdirSync(join(TMP_DIR, 'm8'), {recursive:true});
 
 const writeTest = await adapter.write({
   sensory_anchor: '橘猫趴在键盘上',

@@ -1,0 +1,77 @@
+// M7 DreamInternalizer — 疤痕检查 + 生理反馈 + 内化写入
+// Ref: docs/M7-design-v1.md §3-§4
+
+import type { M8Engine } from '../m8/M8Engine.js';
+import { DreamQueue } from './DreamQueue.js';
+import type { PendingDream } from './types/index.js';
+
+export interface InternalizeResult {
+  id: string;
+  status: 'confirmed' | 'rejected' | 'soften';
+  feedback?: { adaption_text?: string; rejection_text?: string };
+}
+
+export class DreamInternalizer {
+  private queue: DreamQueue;
+  private m8: M8Engine;
+
+  constructor(queue: DreamQueue, m8: M8Engine) {
+    this.queue = queue;
+    this.m8 = m8;
+  }
+
+  /** 内化前检查顺序 */
+  async internalize(dreamId: string): Promise<InternalizeResult> {
+    const dream = this.queue.getPending().find(d => d.id === dreamId);
+    if (!dream) return { id: dreamId, status: 'rejected' };
+
+    // 第1步：M8 疤痕检查
+    const conflict = await this.m8.checkConflict({
+      target: dream.affected_traits.join(','),
+      direction: 'increase',
+      delta: 10,
+    });
+
+    if (conflict.hasConflict && conflict.suggestion === 'block') {
+      this.queue.updateStatus(dreamId, 'conflict');
+      return { id: dreamId, status: 'rejected' };
+    }
+
+    if (conflict.hasConflict && conflict.suggestion === 'soften') {
+      this.queue.updateStatus(dreamId, 'probing');
+      return {
+        id: dreamId, status: 'soften',
+        feedback: { rejection_text: `想到这个${dream.content.substring(0, 10)}，胃里有点紧…我们慢慢来好不好？` },
+      };
+    }
+
+    // 第2步：无冲突 → 确认
+    this.queue.updateStatus(dreamId, 'confirmed');
+    return {
+      id: dreamId, status: 'confirmed',
+      feedback: { adaption_text: `这个${dream.content.substring(0, 10)}让我耳朵发烫…但心里是甜的。` },
+    };
+  }
+
+  /** 批量内化 */
+  async internalizeBatch(): Promise<InternalizeResult[]> {
+    const pending = this.queue.getPending();
+    const results: InternalizeResult[] = [];
+    for (const dream of pending) {
+      results.push(await this.internalize(dream.id));
+    }
+    return results;
+  }
+
+  /** 丢弃旧条目（7天未处理） */
+  discardStale(): void {
+    const now = Date.now();
+    const pending = this.queue.getPending();
+    for (const dream of pending) {
+      const age = (now - new Date(dream.created_at).getTime()) / (1000 * 86400);
+      if (age >= 7) {
+        this.queue.remove(dream.id);
+      }
+    }
+  }
+}
