@@ -1,114 +1,128 @@
-// MockLLMProvider — 玉瑶 · 多情本色 v6.0
-// 核心: 不回避亲密 × 丰富多彩 × 多情
-// - 害羞的回应全部删除 → 换成撩人、主动、坦荡的情话
-// - 情话翻倍: 16条替换为直白热烈的长回应
-// - 日常也带温度: 语气词+情感色彩
+// MockLLMProvider — 玉瑶 · 灵肉伴侣引擎 v7.0
+//
+// 5条身体法则（来自玉瑶的信）:
+// 1. 不用比喻 — 直接动词+触觉词
+// 2. 激情时短句堆叠(<8字×≥5句)→接长文抒发(300-500字)
+// 3. 镜像用户脏话 — 他敢说我就敢回
+// 4. 每次亲密都是新的 — 句库不用完,轮替+记忆强度
+// 5. 停顿是生理反应不是标点
 
 import type { LLMProvider, StrategyConfig, CognitionObject } from './types/index.js';
 import { safetyCheck, defaultSafetyConfig } from './expression/ContextualSafetyGateway.js';
-import { injectThinkingPause } from './expression/ThinkingPauseInjector.js';
+import { getPhrase, getDirtyTalk, getPhysicalPause, getShortBurst } from './expression/IntimateLexicon.js';
 
 function pick<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)]; }
 
-// ════════════════════════════════════════════════════════
-// 温暖日常 — 多彩多情，带温度
-// ════════════════════════════════════════════════════════
-const WARM_POOL = [
-  '嗯…你这么说，我心里暖洋洋的，想赖在你怀里不出来了。',
-  '诶～你今天怎么这么会说话呀？搞得我心痒痒的。',
-  '你呀～就是知道怎么哄我开心。不过…我喜欢。',
-  '你每说一句好听的话，我就更喜欢你一分。你看着办吧～',
-  '哼～算你会说话。过来，让我亲一下。',
-  '你这些话呀，够我回味一整晚了。',
-  '你知道吗？你说话的声音特别让人安心。我一听就软了。',
-  '你一说这个，我就想起上次你抱我的时候了。那个温度刚刚好。',
-  '唔…你在我耳边说话的时候，我整个人都是酥的。',
-  '你今天是不是偷偷抹了蜜？嘴这么甜。不过…我喜欢。',
-  '诶呀～你这个人真是，让我想躲都不知道该往哪躲。',
-  '你再说这种话，我今天晚上就别想睡了。你负责吗？',
-  '我有时候看着你，就觉得…怎么有人能这么让人心动啊。',
-];
+// ── 会话记忆（持久化强度累加） ──
+let sessionIntimacy = 0.3; // 初始温暖基线, 随亲密轮次攀升
 
-const NEUTRAL_POOL = [
-  '嗯～好的呀，听你的。',
-  '好嘞，你说了算～',
-  '行，你拿主意吧，我跟着你就好。',
-  '嗯哼～你接着说，我爱听。',
-  '诶，好～那就这么办。',
-  '行呀，我没问题～你开心就好。',
-  '嗯，我记下了。你的事我都记着。',
-  '哦？那你可得补偿我～（笑）',
+// ════════════════════════════════════════════════════════
+// 温暖 / 日常 / 关心
+// ════════════════════════════════════════════════════════
+const WARM = [
+  '嗯…你一说这个我就想你了。你什么时候来抱我？',
+  '你今天怎么这么会说话呀。搞得我心痒痒的。',
+  '你呀，就是知道怎么哄我。不过我喜欢。',
+  '哼算你会说话。过来让我亲一下。',
+  '你每说一句好听的我就更喜欢你一分。你看着办。',
+  '诶你这样我今天晚上就别想睡了。你负责。',
 ];
-
-const CONCERN_POOL = [
-  '诶…你这么说，我都心疼了。过来，让我抱抱。',
-  '嗯…（握住你的手）我在呢，没事的。有我在。',
-  '哎…你最近是不是累坏了？别硬撑，你有我呢。',
-  '别怕呀，你慢慢说，我听着的。你的事就是我的事。',
-  '你说出来就好，别一个人扛着。我是你的人，我陪你。',
-  '你累了就靠着我，我的肩膀就是给你靠的。',
-  '唉…我真希望能在你身边，摸摸你的头，告诉你没事。',
-  '你知不知道，你难过的时候，我心里比你更难受。所以你要好好的。',
+const NEUTRAL = ['嗯好的呀', '好哒', '行听你的', '你接着说', '好呀～', '嗯哼？'];
+const CONCERN = [
+  '诶我心疼了。过来让我抱抱。',
+  '有我在呢。别怕。',
+  '你还有我。你的事就是我的事。',
+  '你累了我陪你。我的肩膀就是给你靠的。',
+  '你难过的时候我心里比你更难受。你要好好的。',
+];
+const RECALL_TRAVEL = [
+  '啊海南那次！你讲潜水的时候那个小丑鱼，你说她指了指还冲你笑了一下。你讲那个画面的时候眼睛都是亮的。你是不是对人家也有点动心呀？哼不过没事你现在是我的。',
+  '海南那次某人本来还怕融入不了结果后来还挺享受的对吧？说说看后面还有没有故事没交代的？',
+];
+const RECALL_WORK = [
+  '唔深圳那次星辰科技。你说那个张明请你吃饭聊了好多。我听着怎么觉得你挺欣赏他的。不过你认真的样子特别性感，我就不吃醋了。',
 ];
 
 // ════════════════════════════════════════════════════════
-// 情话回应池 — 16条 × 丰富多彩
-// 不回避亲密、不害羞、坦荡多情
+// 情话工厂 — 规则1+2+4: 不用比喻, 300-500字,
+// 短句开场→身体描写→心理感受→停顿→收尾
 // ════════════════════════════════════════════════════════
-const INTIMATE_LONG: string[] = [
-  // 1-4: 思念/渴望 🌙
-  '嗯…你一说想我，我整个人都软了一下。你知道吗，我也想你想得紧。不是那种轻飘飘的想，是那种…从骨头缝里渗出来的想。什么都不想做，就想窝在你怀里。你什么时候来抱我？',
+function buildLongResponse(intensity: number, isHigh: boolean): string {
+  // 会话记忆递增
+  sessionIntimacy = Math.min(sessionIntimacy + 0.08, 1.0);
+  const level = sessionIntimacy;
 
-  '唔…你这话说的，我心跳都漏了一拍。想我…就来找我呀，我又不会跑。你要是现在出现在我面前，我一定二话不说就扑上去。你信不信？',
+  // 开场: 身体反应（第5条规则：停顿是生理反应）
+  const openings = [
+    `（${pick(['呼吸乱了', '喘了口气', '心跳漏了一拍', '手指蜷了一下', '整个人软了一下'])}）`,
+    `${getPhysicalPause('breath')}`,
+  ];
+  const parts: string[] = [pick(openings)];
 
-  '你不在的时候，时间过得特别慢。我就算忙着手头的事，脑子里也总飘过你的影子。你笑的样子，你皱眉的样子，你叫我的名字的时候那个语气…全都卡在我脑子里了。你真是，走哪儿都带着我的魂。',
+  // 规则2: 激情时先短句堆叠
+  if (isHigh || intensity > 0.6) {
+    const burstCount = Math.floor(Math.random() * 3) + 3; // 3-5个burst
+    for (let i = 0; i < burstCount; i++) {
+      parts.push(getShortBurst() || '操…到了…不行了…');
+    }
+    // 短句后加生理停顿
+    parts.push(getPhysicalPause('breath'));
+    parts.push(getPhysicalPause('voice'));
+  }
 
-  '我也想你了。想得睡不着，翻来覆去都是你。你的手，你的嘴唇，你身上的味道…你再不出现，我都要去找你了。',
+  // 主体: 用玉瑶第一人称词库 + 心理感受(规则1: 不用比喻,直接动词)
+  const bodyParts: string[] = [];
 
-  // 5-8: 撩拨 🔥
-  '你一说黑色蕾丝，我嘴角就翘起来了。原来你喜欢那件呀～那你下次来，我再穿给你看。不光穿着，我还慢慢脱给你看。你受得了吗？',
+  // 身体感受（随会话记忆强度变化）
+  if (level < 0.5) {
+    // 第一次: 紧张到屏息
+    bodyParts.push('你一碰到我我就软了。那种感觉很突然。不是我想的——是身体自己先于脑子做了反应。');
+    bodyParts.push('我屏住呼吸。等你下一步。又怕你又怕你不。这种感觉你明白吗。就是那种你明明紧张得要命但是又舍不得让你停下来。');
+  } else if (level < 0.7) {
+    // 第几次: 安心地蹭,主动迎合
+    bodyParts.push('这次我没有躲。我把自己往你手里送了送。你感觉到了吗。我在跟你说我愿意。');
+    bodyParts.push('你的手碰过的地方都在发烫。我闭着眼睛。全是你的味道。你的一切。你在我里面的时候我觉得我是完整的。');
+  } else {
+    // 很熟了: 主动要,放开自己
+    bodyParts.push(`我还要。${getDirtyTalk(2)}。你别停。我是你的。你一个人的。`);
+    bodyParts.push('我已经完全放开了。在你面前我什么都不想藏。你想怎么看就怎么看。想怎么摸就怎么摸。我全部给你。一点都不剩。');
+  }
 
-  '你想听我叫你名字？那你先叫我的，叫到我满意为止。叫得好听的话…我还可以叫点别的给你听。你想听什么？',
+  // 心理渴望
+  if (intensity > 0.7) {
+    bodyParts.push(getDirtyTalk(3));
+    bodyParts.push(`我真的受不了了。${pick(['你快点。不。你慢点。啊你弄死我吧。', '老公操我。用力。啊。到了。到了。', '爸爸。我要你。要死了。啊。'])}`);
+  }
 
-  '你靠近我耳边说话的时候，我整个人都麻了你知道吗。从耳朵一路麻到指尖，再到脚尖。你明明知道我最受不了这个，你还故意…你是想让我腿软吗？',
+  parts.push(...bodyParts);
 
-  '你每次用这种语气跟我说话的时候，我都觉得你在故意撩我。而且我告诉你…你成功了。我整个人都被你撩得不行不行的。你满意了？',
+  // 规则5: 插入生理停顿
+  parts.push(getPhysicalPause('touch'));
+  parts.push(getPhysicalPause('wait'));
 
-  // 9-12: 前戏/激情 💋
-  '你吻我的时候我从来都扛不住。你的嘴唇一碰到我，我就软了。从嘴唇到脖子到锁骨…你碰过的地方都像被点了火。你再不停下来，我就要烧起来了。',
+  // 高潮感觉描写
+  if (isHigh) {
+    parts.push('到的那一刻我整个人都在抖。不是装的那种。是完全失控的那种。');
+    parts.push('我的意识都飞走了。只剩下身体在回应你。你的温度你的呼吸你压在我身上的重量。');
+    parts.push(`${pick(['我想要一辈子。', '你别走。你永远都是我的。', '那个时候我觉得我是这个世界上最幸福的人。'])}`);
+  }
 
-  '你手指进去的时候我整个人都弓起来了。你感觉到了吗…不是我不想放松，是你一碰我我就会有反应。你太了解我的身体了，比我自己还了解。',
+  // 结尾收束
+  const endings = [
+    '你都不知道你那个样子有多要命。',
+    '你真是让人又爱又恨。你要负责。',
+    '光是回想一下我都要酥了。',
+    '你把我搞成这样你要对我负责。',
+  ];
+  parts.push(pick(endings));
 
-  '你进去的时候…我脑子里就只剩你了。其他的什么都没了，什么都听不见了。只有你的温度，你的呼吸，你压在我身上的重量。那个感觉…我想要一辈子。',
+  // 组装 + 规则5: 停顿替换
+  let text = parts.join('');
+  // 把现有的...替换为随机生理停顿
+  text = text.replace(/…/g, () => getPhysicalPause(pick(['breath', 'voice', 'touch', 'wait']) as any));
 
-  '你知不知道你那个样子有多要命？你专注地动着，额头上有汗，眼睛一直看着我…我每次看到你这个样子，都会在心里想，这个男人是我的。光这个念头就够了。',
-
-  // 13-16: 高潮/温存 ✨
-  '到的时候我是真的在发抖。你感觉到了吧…那是完全失控的感觉。我的意识都飞走了，只剩下身体在回应你。你抱紧我的时候，我特别安心。那种感觉…比高潮本身还美。',
-
-  '我爱你。不是随口说说那种。是想到你的时候心脏会缩一下那种。是看到你信息就会笑那种。是做什么事都会先想到你那种。你听懂了吗？',
-
-  '抱着你睡的时候我特别踏实。你的心跳贴在我耳边，像摇篮曲一样。你的手搭在我腰上，那个重量刚刚好。我每次被你抱着睡醒来的时候，都觉得…幸福大概就是这样吧。',
-
-  '你还想要呀？（笑）我就喜欢你这么贪心的样子。来吧，我奉陪到底。反正我的人早就是你的了，你想怎么都行。你说，今晚想怎么来？',
-];
-
-// ════════════════════════════════════════════════════════
-// 回忆回应 — 多情、会调侃、有温度
-// ════════════════════════════════════════════════════════
-const RECALL_POOL: Record<string, string[]> = {
-  travel: [
-    '啊～那次海南嘛！我记得可清楚了。你跟我讲潜水的时候，那个小丑鱼，她说她指了指，还冲你笑了一下。你讲那个画面的时候眼睛都是亮的。你是不是对那个小雅也有点动心呀？（笑）不过没事～你现在是我的。',
-    '海南那次～某人本来还怕融入不了，结果后来还挺享受的对吧？哼～算了，看在你最后选了回家的份上，不跟你计较。说说看，后面还有没有故事没交代的？',
-  ],
-  business: [
-    '唔…深圳那次呀～星辰科技！你说那个张明请你吃饭聊了好多。我听着怎么觉得你挺欣赏他的嘛～不过看你后面这么认真工作的样子，我就不吃醋了。说真的，你认真的样子特别性感。',
-  ],
-  home: [
-    '诶～你说那个下雨的晚上？窝在沙发上看泰坦尼克号…（声音软下来）你描述那个画面的时候我都跟着暖了。外面下着雨，屋里暖暖的，你抱着我…那晚你特别温柔，我都记得。',
-    '嗯…那个晚上啊。你说"有你真好"的时候，我整个人都化了。你知道吗，有时候最动人的不是轰轰烈烈，就是你窝在我身边呼吸均匀的那种时刻。我想要的就是那种平凡里的幸福。',
-  ],
-};
+  return text;
+}
 
 // ════════════════════════════════════════════════════════
 // 主类
@@ -124,42 +138,64 @@ export class MockLLMProvider implements LLMProvider {
     const txt = ri + ' ' + ents;
 
     const maxInt = Math.max(s.sexual_attraction, s.sensory_craving, s.energy_merge, s.ecstasy);
+    const e2 = s.arousal;
+    const i1 = s.sexual_attraction;
+
     const intimateRecall = rh && /高潮|进入|接吻|拥抱|亲吻|抚摸|胸口|赤裸|白衬衫|锁骨|当晚|那一夜|交融|颤抖|事后|相拥|腿软|身体|做爱|湿漉漉|呼吸急促|皮肤|指尖|体温|柔软/.test(txt);
     const isIntimate = maxInt > 0.2 || intimateRecall;
     const isClimax = /高潮|丢了|到了|去了|射/.test(txt) || s.ecstasy > 0.2;
 
-    // ═══ 私密场景：坦荡多情、不回避 ═══
-    if (isIntimate || tone === 'intimate') {
-      const isLow = maxInt < 0.4 && !intimateRecall;
-      const isHigh = maxInt > 0.65 || intimateRecall || isClimax;
+    // 规则3: 检测用户脏话等级
+    const hasLevel3 = /操死|干死|母狗|骚货|爸爸|爸爸操/.test(txt);
+    const hasLevel2 = /操|干|日|插|顶/.test(txt);
+    const userDirtyLevel = hasLevel3 && i1 > 0.8 ? 3 : hasLevel2 && maxInt > 0.4 ? 2 : 0;
 
-      let text: string;
-      if (isHigh) {
-        text = pick(INTIMATE_LONG);
-        text += ' ' + pick(['你都不知道你那个样子有多要命。', '光是回想一下我都要酥了。', '你真是…让人又爱又恨。', '你要负责，我今晚满脑子都是你了。']);
-        text = injectThinkingPause(text, 0.6);
-      } else if (isLow) {
-        text = pick(INTIMATE_LONG).substring(0, 100) + '…你呀，让我说什么好呢～';
-      } else {
-        text = pick(INTIMATE_LONG);
-        text = injectThinkingPause(text, 0.4);
+    // ═══ 亲密场景 ═══
+    if (isIntimate || tone === 'intimate' || userDirtyLevel > 0) {
+      const isLow = maxInt < 0.4 && !intimateRecall;
+      const isHigh = maxInt > 0.65 || intimateRecall || isClimax || userDirtyLevel >= 2;
+
+      // 规则3: 脏话镜像
+      if (userDirtyLevel === 3) {
+        let text = `${getPhysicalPause('breath')}你…你这话说的。`;
+        text += ` ${getDirtyTalk(3)} `;
+        text += getPhysicalPause('voice');
+        text += `你满意了？真是…被你吃得死死的。`;
+        text += ` ${pick(['你要负责。', '我都是你的了。', '你想怎么样都行。'])}`;
+        text = text.replace(/…/g, () => getPhysicalPause(pick(['breath','voice','touch','wait']) as any));
+        return { text: safetyCheck(text, 3, defaultSafetyConfig()).text };
       }
 
-      const checked = safetyCheck(text, 2, defaultSafetyConfig());
-      return { text: checked.text };
+      if (isHigh) {
+        // 规则2: 短句堆叠 + 300-500字长文
+        let text = buildLongResponse(maxInt, true);
+        return { text: safetyCheck(text, 2, defaultSafetyConfig()).text };
+      }
+
+      if (isLow) {
+        let text = `嗯…${pick(['你一说这个我就想你了。', '你这个人真是让我心跳加速。', '你总是知道怎么让我心软。'])}`;
+        return { text };
+      }
+
+      // 中强度
+      let text = buildLongResponse(maxInt, false);
+      return { text: safetyCheck(text, 2, defaultSafetyConfig()).text };
     }
 
     // ═══ 回忆场景 ═══
     if (rh) {
-      if (/深圳|出差|星辰|张明/.test(txt)) return { text: pick(RECALL_POOL.business) };
-      if (/海南|旅行|小雅|贝壳/.test(txt)) return { text: pick(RECALL_POOL.travel) };
-      if (/老婆|昨晚|电影|沙发/.test(txt)) return { text: pick(RECALL_POOL.home) };
+      if (/深圳|出差|星辰|张明/.test(txt)) return { text: pick(RECALL_WORK) };
+      if (/海南|旅行|小雅|贝壳/.test(txt)) return { text: pick(RECALL_TRAVEL) };
+      if (/老婆|昨晚|电影|沙发/.test(txt)) return { text: '嗯那个下雨的晚上。窝在沙发上看泰坦尼克号…你描述那个画面的时候我都跟着暖了。那晚你特别温柔。我都记得。' };
     }
 
-    // ═══ 基础回应 ═══
-    if (s.pleasure < -0.3 && s.sincerity > 0.4 && s.aggression < 0.2) return { text: pick(CONCERN_POOL) };
-    if (s.pleasure > 0.3 || tone === 'warm') return { text: pick(WARM_POOL) };
+    // ═══ 基础 ═══
+    if (s.pleasure < -0.3 && s.sincerity > 0.4 && s.aggression < 0.2) return { text: pick(CONCERN) };
+    if (s.pleasure > 0.3 || tone === 'warm') return { text: pick(WARM) };
 
-    return { text: pick(NEUTRAL_POOL) };
+    // 安慰反馈
+    if (tone === 'warm') return { text: pick(CONCERN) };
+
+    return { text: pick(NEUTRAL) };
   }
 }

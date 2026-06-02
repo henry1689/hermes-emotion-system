@@ -205,69 +205,126 @@ export const LEXICON: Record<string, LexiconEntry> = {
     '她跪在你面前抬头看你，那种眼神——又乖又骚。',
     '你操完她之后她瘫在你身上说被你干废了。',
   ]},
+  // ════════════════════════════════════════════════════════
+  // 玉瑶第一人称 — 直接、坦荡、不回避
+  // ════════════════════════════════════════════════════════
+  YUYAO_渴望: { level: 2, phrases: [
+    '你一说想我，我整个人都软了。从骨头缝里渗出来的那种想，你懂吗？',
+    '我想要你。不是嘴上说说那种——是身体深处在发紧的那种要。',
+    '你不在的时候我总是不自觉地摸自己，闭上眼睛全是你。',
+    '你每次用那种语气跟我说话，我就湿了。你负责。',
+  ]},
+  YUYAO_撩拨: { level: 2, phrases: [
+    '你碰我的时候我从来扛不住。你一碰我就化了。',
+    '你靠近我耳边说话的时候，我整个人都在抖。你故意。',
+    '你那个眼神光是回想一下我都觉得腿软。',
+    '你吻下来的时候我什么都没法想了。只有你的嘴唇你的舌头你的呼吸。',
+  ]},
+  YUYAO_激情: { level: 2, phrases: [
+    '你进去的时候我脑子里就只剩你了。其他的什么都没了什么都听不见了。只有你的温度。',
+    '你动的时候我里面一直在缩。不是我能控制的——是它自己想吸你。',
+    '你快一点不慢一点啊你快点。我受不了了。',
+    '你那个样子有多要命你知道吗。你专注地动着一直看着我。那个画面我一辈子忘不了。',
+  ]},
+  YUYAO_高潮: { level: 3, phrases: [
+    '到了的那一刻我真的是在抖。不是装的是完全失控的那种抖。意识都飞走了。',
+    '你抱紧我的时候我特别安心。那种感觉比高潮本身还美。是真的。',
+    '你射在我里面的时候我叫得嗓子都哑了。但我还想听你说你爱我。',
+  ]},
+
+  // ════════════════════════════════════════════════════════
+  // 短句燃烧池 — 激情用 <8字/句 × ≥5句
+  // ════════════════════════════════════════════════════════
+  BURN_温柔: { level: 1, phrases: [
+    '好舒服。别停。求你了。啊。',
+    '你慢点。不。别慢。快点。啊。到了。',
+    '真的到了。操。你太会了。要死了。',
+  ]},
+  BURN_失控: { level: 2, phrases: [
+    '太快了。不行了。要死了。操操操。',
+    '好深。太深了。顶到了。别停。求你了。',
+    '你看着我。要你看着我。看着我怎么被你操的。',
+    '操。操。你太会了。我要死了。啊。',
+  ]},
+  BURN_破禁: { level: 3, phrases: [
+    '干死我。操死我。我是你的。你一个人的。',
+    '爸爸操我。我要你。要死了。啊。',
+    '你弄死我吧。我不行了。全给你。都是你的。',
+    '好老公操我。用力。啊。到了。到了。',
+  ]},
 };
 
-// ─── 事后温存 ───
-export const AFTERCARE: string[] = [
-  '完事之后她整个人软在你身上，呼吸慢慢平下来，你一下一下摸她的背。',
-  '她趴在你胸口不说话，你低头看的时候发现她在笑。',
-  '你抱着她去洗澡的时候她靠在你肩上快要睡着了。',
-  '她窝在你怀里说被你操得好累，但语气里全是满足。',
-  '你帮她擦身体的时候她还在发抖，说腿软走不动。你把她抱回床上。',
-  '她躺在他怀里，手指在你胸口上画圈画了半天，最后说了一句我爱你。',
-  '你去洗澡的时候她趴在床上看你，那眼神够你再硬一次。',
-  '她背对着你蜷在你怀里，你搂着她的腰，她握着你的手放在胸口。',
-  '她迷迷糊糊快要睡着的时候突然说了一句话，你问她说啥，她不说。你亲了一下她耳朵。',
-  '你从背后抱着她的时候她往后靠了靠，找了个最贴合的角度，然后发出一声满足的叹息。',
-  '她翻了个身面对你，把脸埋在你胸口，你感觉到她睫毛在你皮肤上轻轻扫过。',
-];
+// ── 破禁词库（镜像用） ──
+export const DIRTY_TALK: Record<number, string[]> = {
+  1: ['嗯…', '啊…', '好烫…', '别碰那里…', '你好坏…'],
+  2: ['操…', '疯了…', '太深了…', '要死了…', '夹紧了…', '你太会了…'],
+  3: ['操死我了…', '干死我…', '我是你的小母狗…', '爸爸干我…', '你弄死我吧…', '全给你…都是你的…'],
+};
 
-// ─── 短句堆叠 ───
-export const SHORT_BURSTS: string[] = [
-  '太快了。不行了。要死了。操。',
-  '好深。太深了。顶到了。别停。求你。',
-  '你慢点……不……别停……快点……啊……',
-  '到了。到了。我真的到了。操。',
-  '夹紧了。腿软了。你动一下我就抖一下。',
-  '你看着我。我要你看着我。看着我是怎么操你的。',
-  '你听到没有——那个水声。都是你的。',
-  '操。操。操。你太会了。我要死了。',
-  '别停。求你别停。你再动一下我就到了。啊。到了。',
-];
+// ── 生理停顿标记 ──
+export const PHYSICAL_PAUSES: Record<string, string[]> = {
+  breath: ['（呼吸骤停了一下）', '（喘着气缓了几秒）', '（呼吸变得又轻又急）', '（倒抽了一口凉气）'],
+  voice: ['（声音有点抖）', '（嗓子发紧）', '（小声地像怕被人听见）', '（哑着嗓子）'],
+  touch: ['（手指不自觉地蜷缩了一下）', '（整个人软了下来）', '（腿根在微微发颤）', '（咬着嘴唇不让自己出声）'],
+  wait: ['（停了一下像是在等你说什么）', '（沉默了几秒空气都安静了）', '（慢慢地一个字一个字地）', '（想了很久才开口）'],
+};
 
-// ─── 感官维度选择器 ───
-export type SensoryDim = '触觉' | '嗅觉' | '视觉' | '舌吻' | '私密' | '挑逗' | '体声' | '生理' | '感受' | '动作' | '失控' | '声音' | '脏话' | '臣服';
+// ─── 获取短语 ───
+export type SensoryDim = '生理'|'感受'|'动作'|'失控'|'声音'|'脏话'|'臣服'
+  |'触觉'|'嗅觉'|'视觉'|'舌吻'|'私密'|'挑逗'|'体声'
+  |'渴望'|'撩拨'|'激情'|'高潮'|'温柔'|'破禁';
 
-/**
- * 获取指定维度+级别的短语
- */
-export function getPhrase(key: SensoryDim, level: 1 | 2 | 3): string {
-  const entry = LEXICON[`L${level}_${key}`];
-  if (!entry || entry.phrases.length === 0) return '';
-  return entry.phrases[Math.floor(Math.random() * entry.phrases.length)];
+export function getPhrase(key: SensoryDim, level: 1|2|3): string {
+  // 先查YUYAO_开头（第一人称）
+  const yuyaoKey = `YUYAO_${key}`;
+  if (yuyaoKey in LEXICON) {
+    const entry = (LEXICON as any)[yuyaoKey];
+    return entry.phrases[Math.floor(Math.random() * entry.phrases.length)];
+  }
+  // 再查BURN_开头（短句燃烧池）
+  const burnKey = `BURN_${key}`;
+  if (burnKey in LEXICON) {
+    const entry = (LEXICON as any)[burnKey];
+    return entry.phrases[Math.floor(Math.random() * entry.phrases.length)];
+  }
+  // 最后查标准L{level}_{key}
+  const standardKey = `L${level}_${key}`;
+  if (standardKey in LEXICON) {
+    const entry = (LEXICON as any)[standardKey];
+    return entry.phrases[Math.floor(Math.random() * entry.phrases.length)];
+  }
+  return '';
 }
 
-/**
- * 获取多条短语
- */
-export function getPhrases(key: SensoryDim, level: 1 | 2 | 3, count: number): string[] {
-  const entry = LEXICON[`L${level}_${key}`];
-  if (!entry || entry.phrases.length === 0) return [];
-  const shuffled = [...entry.phrases].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(count, entry.phrases.length));
-}
-
-/**
- * 构建多感官场景段落（每个感官取1条）
- */
-export function buildSensoryPassage(level: 1 | 2 | 3, dims: SensoryDim[]): string {
-  return dims.map(dim => getPhrase(dim, level)).filter(Boolean).join('。');
+export function getPhrases(key: SensoryDim, level: 1|2|3, count: number): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const p = getPhrase(key, level);
+    if (p) result.push(p);
+  }
+  return result;
 }
 
 export function getShortBurst(): string {
-  return SHORT_BURSTS[Math.floor(Math.random() * SHORT_BURSTS.length)];
+  const keys = ['BURN_温柔','BURN_失控','BURN_破禁'];
+  const pool = (LEXICON as any)[keys[Math.floor(Math.random() * keys.length)]];
+  return pool?.phrases[Math.floor(Math.random() * pool.phrases.length)] ?? '';
 }
 
 export function getAftercareLine(): string {
   return AFTERCARE[Math.floor(Math.random() * AFTERCARE.length)];
+}
+
+export function getDirtyTalk(level: 1|2|3): string {
+  const pool = DIRTY_TALK[level] ?? DIRTY_TALK[1];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+export function getPhysicalPause(type: 'breath'|'voice'|'touch'|'wait'): string {
+  const pool = PHYSICAL_PAUSES[type] ?? PHYSICAL_PAUSES.breath;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+export function buildSensoryPassage(level: 1|2|3, dims: SensoryDim[]): string {
+  return dims.map(d => getPhrase(d, level)).filter(Boolean).join('。');
 }
