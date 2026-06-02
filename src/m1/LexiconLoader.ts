@@ -15,7 +15,8 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const LEXICON_DIR = join(process.cwd(), 'data', 'lexicons');
+const PROJECT_ROOT = join(__dirname, '..', '..');
+const LEXICON_DIR = join(PROJECT_ROOT, 'data', 'lexicons');
 
 /** 缓存 */
 const cache = new Map<string, any>();
