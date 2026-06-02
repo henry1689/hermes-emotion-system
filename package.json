@@ -1,0 +1,17 @@
+{
+  "name": "hermes-emotion-system",
+  "version": "0.1.0",
+  "description": "情感伴侣类脑认知系统 - M1 DNA编码器模块",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  }
+}
