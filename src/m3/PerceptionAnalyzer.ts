@@ -51,6 +51,8 @@ const NEGATIVE_WORDS = new Set([
 const HIGH_AROUSAL_WORDS = new Set([
   '崩溃', '绝望', '愤怒', '狂喜', '震惊', '吓死', '兴奋极了',
   '气死', '爱死', '受不了', '抓狂', '疯掉',
+  '颤抖', '颤栗', '战栗', '呼吸急促', '喘息', '呻吟',
+  '剧烈', '强烈', '紧紧', '压抑', '轻吟', '忍不住',
 ]);
 
 const LOW_AROUSAL_WORDS = new Set([
@@ -157,6 +159,8 @@ const ENERGY_MERGE = new Set([
   '融合', '合一', '同频', '共振',
   '那一刻', '世界只剩', '无比美好', '自然',
   '有你真好', '感动', '浪漫', '温馨',
+  '交融', '共鸣', '灵魂', '融合', '合一', '同频', '共振',
+  '合二为一', '融为一体', '融为一体', '同步', '和谐',
 ]);
 
 const POSSESSIVENESS = new Set([
@@ -167,6 +171,7 @@ const POSSESSIVENESS = new Set([
 const ECSTASY_WORDS = new Set([
   '极致', '完美', '最幸福', '太棒了', '无与伦比',
   '天堂', '最美', '最快乐',
+  '高潮', '巅峰', '释放', '淹没', '极致快乐', '欢愉',
 ]);
 
 const SAFETY_WORDS = new Set([

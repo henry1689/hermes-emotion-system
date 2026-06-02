@@ -9,6 +9,19 @@ export interface CognitionObject {
     emotion_summary: string;
     key_entities: string[];
     calcium_level: number;
+    /** 感知维度快照 — 用于情绪镜像 */
+    raw_input: string;
+    perception_snapshot: {
+      pleasure: number;
+      arousal: number;
+      intimacy: number;
+      sexual_attraction: number;
+      sensory_craving: number;
+      energy_merge: number;
+      possessiveness: number;
+      ecstasy: number;
+      safety: number;
+    };
   };
   history: {
     has_relevant_history: boolean;
@@ -20,7 +33,7 @@ export interface CognitionObject {
     relationships: string[];
   };
   strategy_hint: {
-    tone: 'warm' | 'neutral' | 'serious';
+    tone: 'warm' | 'neutral' | 'serious' | 'intimate';
     depth: 'shallow' | 'medium' | 'deep';
     urgency: 'low' | 'medium' | 'high';
   };
