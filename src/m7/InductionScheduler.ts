@@ -189,6 +189,11 @@ export class InductionScheduler {
     return '平静中性';
   }
 
+  /** 手动触发实体关系图构建 */
+  triggerEntityRelations(): void {
+    this.buildEntityRelations();
+  }
+
   /**
    * 结构归纳：分析记忆中的实体共现关系，构建 entity_relations 图。
    * 如果"加班"和"累"总是同时出现，就在两者之间建立关联。

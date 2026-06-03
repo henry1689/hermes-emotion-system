@@ -25,11 +25,11 @@ export interface NeuralData {
 
 /** 分组颜色映射 */
 export const GROUP_COLORS: Record<number, string> = {
-  0: '#00ffff', // 青色 Cyan
-  1: '#ff6600', // 橙色 Orange
-  2: '#ff00ff', // 品红 Magenta
-  3: '#00ff88', // 翠绿
-  4: '#8888ff', // 淡紫
+  0: '#00ffff',  // 青色 Cyan — 主色
+  1: '#ff8844',  // 暖橙 Warm Orange — 情绪点缀
+  2: '#f0d8b0',  // 暖白 Warm White — 透气孔
+  3: '#00cc99',  // 青绿 Teal — 邻近色
+  4: '#8888ff',  // 淡紫 Lavender — 辅助
 };
 
 /** 3D 场景中粒子状态（含运行时动画数据） */

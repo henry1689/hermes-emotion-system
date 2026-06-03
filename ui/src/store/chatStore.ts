@@ -16,6 +16,9 @@ interface ChatStore {
   isTyping: boolean;
   error: string | null;
   turnCount: number;
+  /** 情绪传染触发时闪烁 */
+  emotionalFlash: boolean;
+  triggeredMemoryId: string | null;
 
   toggleOpen: () => void;
   setOpen: (open: boolean) => void;
@@ -24,6 +27,7 @@ interface ChatStore {
   setError: (error: string | null) => void;
   setTurnCount: (count: number) => void;
   clearMessages: () => void;
+  triggerFlash: (memoryId?: string) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -32,6 +36,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   isTyping: false,
   error: null,
   turnCount: 0,
+  emotionalFlash: false,
+  triggeredMemoryId: null,
 
   toggleOpen: () => set((s) => ({ isOpen: !s.isOpen })),
   setOpen: (open) => set({ isOpen: open }),
@@ -52,5 +58,10 @@ export const useChatStore = create<ChatStore>((set) => ({
   setTyping: (typing) => set({ isTyping: typing }),
   setError: (error) => set({ error }),
   setTurnCount: (count) => set({ turnCount: count }),
-  clearMessages: () => set({ messages: [], turnCount: 0 }),
+  clearMessages: () => set({ messages: [], turnCount: 0, emotionalFlash: false, triggeredMemoryId: null }),
+  triggerFlash: (memoryId) => {
+    set({ emotionalFlash: true, triggeredMemoryId: memoryId ?? null });
+    // 1.5 秒后自动熄灭
+    setTimeout(() => set({ emotionalFlash: false, triggeredMemoryId: null }), 1500);
+  },
 }));

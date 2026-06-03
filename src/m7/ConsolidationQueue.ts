@@ -1,0 +1,75 @@
+/**
+ * ConsolidationQueue — 空闲记忆回放队列
+ *
+ * 当系统空闲时（无用户消息 >30s），从近期记忆中挑选高钙化候选，
+ * 验证其钙化是否维持高水平，晋升符合条件的到 M8 地标。
+ *
+ * 这是 M7 空闲巩固管道的一部分，与 DreamQueue 并行运行。
+ */
+import type { FusionStorageAdapter } from '../fusion/FusionStorageAdapter.js';
+
+export class ConsolidationQueue {
+  private storage: FusionStorageAdapter;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastActivity = Date.now();
+  private readonly IDLE_THRESHOLD = 30_000; // 30s 无消息视为空闲
+  private readonly CHECK_INTERVAL = 10_000;  // 每 10s 检查一次
+
+  constructor(storage: FusionStorageAdapter) {
+    this.storage = storage;
+  }
+
+  /** 记录用户活动（由 server.ts 在每次聊天时调用） */
+  recordActivity(): void {
+    this.lastActivity = Date.now();
+  }
+
+  start(): void {
+    console.log('[Consolidation] 启动巩固队列');
+    const loop = () => {
+      const idle = Date.now() - this.lastActivity;
+      if (idle > this.IDLE_THRESHOLD) {
+        this.runConsolidation().catch(() => {});
+      }
+      this.idleTimer = setTimeout(loop, this.CHECK_INTERVAL);
+    };
+    this.idleTimer = setTimeout(loop, this.CHECK_INTERVAL * 3); // 首次延迟
+  }
+
+  stop(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+  }
+
+  private async runConsolidation(): Promise<void> {
+    try {
+      const sqlite = this.storage.getSQLite();
+
+      // 获取最近 30 条记录，寻找高钙化候选
+      const recent = sqlite.findBySeqPosRange(0, 999_999_999, 30);
+      const candidates = recent
+        .filter(r => !r.is_landmark && r.calcium_level >= 2)
+        .sort((a, b) => b.calcium_score - a.calcium_score)
+        .slice(0, 3);
+
+      let promoted = 0;
+      for (const candidate of candidates) {
+        // 重新分析钙化（模拟"回放"效果）
+        // 实际是检查 calcium_score 是否稳定
+        if (candidate.calcium_score >= 0.7 && candidate.effective_strength > 0.3) {
+          const success = sqlite.promoteToLandmark(
+            candidate.id,
+            candidate.calcium_score >= 0.85 ? '重要时刻' : '值得记住的瞬间',
+            candidate.entity_genes.map(g => g.name).join('、'),
+          );
+          if (success) promoted++;
+        }
+      }
+
+      if (promoted > 0) {
+        console.log(`[Consolidation] 晋升 ${promoted} 条记忆为地标`);
+      }
+    } catch (err) {
+      console.warn('[Consolidation] 巩固失败:', err);
+    }
+  }
+}

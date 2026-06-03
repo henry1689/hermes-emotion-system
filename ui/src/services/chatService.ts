@@ -17,6 +17,8 @@ interface ChatResponse {
   m3: any;
   m4: any;
   m5: any;
+  emotionalFlash?: boolean;
+  triggeredMemoryId?: string | null;
 }
 
 /** 发送消息给玉瑶 */
@@ -43,6 +45,11 @@ export async function sendMessage(message: string): Promise<ChatResponse> {
 
     // 将 M1-M5 分析结果注入思维流
     pushChatModules(data);
+
+    // 情绪传染 flash
+    if (data.emotionalFlash) {
+      store.triggerFlash(data.triggeredMemoryId ?? undefined);
+    }
 
     return data;
   } catch (err) {

@@ -150,16 +150,67 @@ async function pollModules(): Promise<void> {
   }
 }
 
+// ──────────────────────────────────────────────
+// 归纳感悟 + 关系图 轮询
+// ──────────────────────────────────────────────
+
+let inductionTimer: ReturnType<typeof setInterval> | null = null;
+
+async function pollInductions(): Promise<void> {
+  try {
+    const store = useThoughtStore.getState();
+
+    // 获取归纳感悟
+    const indRes = await fetch(`${API_BASE}/inductions`);
+    if (indRes.ok) {
+      const indData = await indRes.json();
+      const reflections = (indData.inductions ?? [])
+        .filter((i: any) => i.reflection)
+        .slice(-1); // 只看最新一条
+
+      for (const ind of reflections) {
+        store.pushThought({
+          module: 'IN',
+          ...MODULE_META.IN,
+          label: `💭 ${new Date(ind.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`,
+          text: ind.reflection.substring(0, 120) + (ind.reflection.length > 120 ? '...' : ''),
+          energy: Math.min(ind.avg_calcium, 1),
+        });
+      }
+    }
+
+    // 获取关系图摘要
+    const relRes = await fetch(`${API_BASE}/relations`);
+    if (relRes.ok) {
+      const relData = await relRes.json();
+      if (relData.count >= 5) {
+        store.pushThought({
+          module: 'RE',
+          ...MODULE_META.RE,
+          label: `${relData.count} 条关联`,
+          text: relData.relations.slice(-5).map((r: any) => `${r.entityA}→${r.entityB}`).join(' · '),
+          energy: Math.min(relData.count / 15, 1),
+        });
+      }
+    }
+  } catch {
+    // 静默
+  }
+}
+
 /**
- * 启动 M6-M8 轮询（每 15 秒）
+ * 启动 M6-M8 + 归纳轮询
  */
 export function startPolling(): void {
   stopPolling();
-  // 首次拉取
   pollModules();
   pollTimer = setInterval(pollModules, 15_000);
+
+  pollInductions();
+  inductionTimer = setInterval(pollInductions, 60_000);
 }
 
 export function stopPolling(): void {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (inductionTimer) { clearInterval(inductionTimer); inductionTimer = null; }
 }

@@ -93,14 +93,42 @@ export class FusionStorageAdapter {
 
   async findByLocus(locusPath: string, options?: QueryOptions): Promise<DNA[]> {
     this.ensureReady();
-    const records = this.sqlite.findByLocus(locusPath, options?.limit ?? 20);
+    // 默认过滤低强度记忆（strength < 0.05 的不返回）
+    const records = this.sqlite.findByLocusWithStrength(locusPath, options?.limit ?? 20, 0.05);
     return records.map(r => this.toDNA(r));
   }
 
   async findBySeqPosRange(start: number, end: number, options?: QueryOptions): Promise<DNA[]> {
     this.ensureReady();
-    const records = this.sqlite.findBySeqPosRange(start, end, options?.limit ?? 50);
+    // 默认衰减门控：strength < 0.05 的不返回，按 (strength * calcium) 排序
+    const records = this.sqlite.findBySeqPosRangeWithStrength(start, end, options?.limit ?? 50, 0.05);
     return records.map(r => this.toDNA(r));
+  }
+
+  /** 带衰减门控的范围检索 */
+  async findBySeqPosRangeFiltered(start: number, end: number, options?: QueryOptions & { minStrength?: number }): Promise<DNA[]> {
+    this.ensureReady();
+    const records = this.sqlite.findBySeqPosRangeWithStrength(start, end, options?.limit ?? 50, options?.minStrength ?? 0.05);
+    return records.map(r => this.toDNA(r));
+  }
+
+  /** 带衰减门控的话题检索 */
+  async findByLocusFiltered(locusPath: string, options?: QueryOptions & { minStrength?: number }): Promise<DNA[]> {
+    this.ensureReady();
+    const records = this.sqlite.findByLocusWithStrength(locusPath, options?.limit ?? 20, options?.minStrength ?? 0.05);
+    return records.map(r => this.toDNA(r));
+  }
+
+  /** 获取衰减日志摘要 */
+  getDecayStats(): { avgStrength: number; strongCount: number; weakCount: number } {
+    const all = this.sqlite.findBySeqPosRange(0, 999_999_999, 200);
+    if (all.length === 0) return { avgStrength: 0, strongCount: 0, weakCount: 0 };
+    const avg = all.reduce((s, r) => s + r.effective_strength, 0) / all.length;
+    return {
+      avgStrength: Math.round(avg * 100) / 100,
+      strongCount: all.filter(r => r.effective_strength > 0.5).length,
+      weakCount: all.filter(r => r.effective_strength < 0.1).length,
+    };
   }
 
   // ─── 新增：情感检索 ───
@@ -133,6 +161,20 @@ export class FusionStorageAdapter {
   runDecayMaintenance(): { total: number; archived: number } {
     this.ensureReady();
     return this.sqlite.runDecayMaintenance();
+  }
+
+  // ─── 实体关系检索 ───
+
+  findRelatedEntities(entityNames: string[], minStrength = 0.3) {
+    return this.sqlite.findRelatedEntities(entityNames, minStrength);
+  }
+
+  findMemoriesByEntityNames(entityNames: string[], limit = 10) {
+    return this.sqlite.findMemoriesByEntityNames(entityNames, limit);
+  }
+
+  getEntityRelationSummary() {
+    return this.sqlite.getEntityRelationSummary();
   }
 
   // ─── 状态 ───

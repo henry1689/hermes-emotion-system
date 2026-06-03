@@ -183,6 +183,36 @@ export class SQLiteAdapter {
     return this.rowsToRecords(res);
   }
 
+  /** 带衰减门控的检索 — 过滤低强度记忆，按 (strength * calcium) 排序 */
+  findBySeqPosRangeWithStrength(start: number, end: number, limit = 50, minStrength = 0.05): EmotionalMemoryRecord[] {
+    this.ensureReady();
+    // 先拉取较多候选，再在应用层排序
+    const res = this.execSql(
+      `SELECT * FROM memories WHERE seq_pos >= ? AND seq_pos <= ?
+       ORDER BY seq_pos DESC LIMIT ?`,
+      [start, end, Math.min(limit * 3, 200)],
+    );
+    const records = this.rowsToRecords(res);
+    // 过滤 + 排序（按 strength * calcium 综合分降序）
+    return records
+      .filter(r => r.effective_strength >= minStrength)
+      .sort((a, b) => (b.effective_strength * b.calcium_score) - (a.effective_strength * a.calcium_score))
+      .slice(0, limit);
+  }
+
+  /** 按 strength 过滤的 findByLocus */
+  findByLocusWithStrength(locusPath: string, limit = 20, minStrength = 0.05): EmotionalMemoryRecord[] {
+    this.ensureReady();
+    const res = this.execSql(
+      `SELECT * FROM memories WHERE locus_path LIKE ?
+       ORDER BY seq_pos DESC LIMIT ?`,
+      [`${locusPath}%`, limit * 2],
+    );
+    return this.rowsToRecords(res)
+      .filter(r => r.effective_strength >= minStrength)
+      .slice(0, limit);
+  }
+
   /** 按 locus_path 前缀匹配 */
   findByLocus(locusPath: string, limit = 20): EmotionalMemoryRecord[] {
     this.ensureReady();
@@ -422,10 +452,100 @@ export class SQLiteAdapter {
   }
 
   /** 直接执行 SQL（供 InductionScheduler 等内部使用） */
+  /** 直接执行 SQL（供 InductionScheduler 等内部使用） */
   writeRaw(sql: string, ...params: any[]): void {
     this.ensureReady();
     this.runSql(sql, params.length > 0 ? params : undefined);
     this.save();
+  }
+
+  // ─── 实体关系检索 ───
+
+  /**
+   * 根据当前实体名称，查找实体关系图中关联的其他实体。
+   * 例如："加班" → 查到 "累"、"深夜"、"压力"
+   */
+  findRelatedEntities(entityNames: string[], minStrength = 0.3): Array<{
+    name: string;
+    relation: string;
+    strength: number;
+  }> {
+    this.ensureReady();
+    if (entityNames.length === 0) return [];
+
+    const placeholders = entityNames.map(() => '?').join(',');
+    const results = this.execSql(
+      `SELECT e.name, er.relation, er.strength
+       FROM entity_relations er
+       JOIN entities e ON e.id = er.entity_b_id
+       WHERE er.entity_a_id IN (SELECT id FROM entities WHERE name IN (${placeholders}))
+         AND er.strength >= ?
+       UNION
+       SELECT e.name, er.relation, er.strength
+       FROM entity_relations er
+       JOIN entities e ON e.id = er.entity_a_id
+       WHERE er.entity_b_id IN (SELECT id FROM entities WHERE name IN (${placeholders}))
+         AND er.strength >= ?
+       ORDER BY strength DESC
+       LIMIT 15`,
+      [...entityNames, minStrength, ...entityNames, minStrength],
+    );
+
+    if (results.length === 0) return [];
+    const { columns, values } = results[0];
+    return values.map((row: any[]) => ({
+      name: row[columns.indexOf('name')] as string,
+      relation: row[columns.indexOf('relation')] as string,
+      strength: row[columns.indexOf('strength')] as number,
+    }));
+  }
+
+  /**
+   * 通过实体名称查找关联的记忆。
+   * 利用 memory_entities 表做 JOIN，比全文搜索 raw_input 更精准。
+   */
+  findMemoriesByEntityNames(entityNames: string[], limit = 10): EmotionalMemoryRecord[] {
+    this.ensureReady();
+    if (entityNames.length === 0) return [];
+
+    const placeholders = entityNames.map(() => '?').join(',');
+    const results = this.execSql(
+      `SELECT DISTINCT m.* FROM memories m
+       JOIN memory_entities me ON me.memory_id = m.id
+       JOIN entities e ON e.id = me.entity_id
+       WHERE e.name IN (${placeholders})
+       ORDER BY m.calcium_score DESC
+       LIMIT ?`,
+      [...entityNames, limit],
+    );
+
+    return this.rowsToRecords(results);
+  }
+
+  /** 获取实体关系图摘要（调试用） */
+  getEntityRelationSummary(): Array<{
+    entityA: string;
+    entityB: string;
+    relation: string;
+    strength: number;
+  }> {
+    this.ensureReady();
+    const results = this.execSql(
+      `SELECT a.name as entityA, b.name as entityB, er.relation, er.strength
+       FROM entity_relations er
+       JOIN entities a ON a.id = er.entity_a_id
+       JOIN entities b ON b.id = er.entity_b_id
+       ORDER BY er.strength DESC
+       LIMIT 30`,
+    );
+    if (results.length === 0) return [];
+    const { columns, values } = results[0];
+    return values.map((row: any[]) => ({
+      entityA: row[columns.indexOf('entityA')] as string,
+      entityB: row[columns.indexOf('entityB')] as string,
+      relation: row[columns.indexOf('relation')] as string,
+      strength: row[columns.indexOf('strength')] as number,
+    }));
   }
 
   // ─── 私有方法 ───

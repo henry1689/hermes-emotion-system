@@ -1,13 +1,14 @@
 /**
  * ThoughtStream — 右栏：M1-M8 实时思维流
  *
+ * 信息像瀑布一样自动从上往下缓慢循环流动，永不停歇。
  * 数据来源：
  * - M1~M5：来自用户聊天后的 Hermes 全管线分析
  * - M6~M8：每 15 秒轮询 /api/modules
  *
  * 未连接后端时显示占位提示。
  */
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useThoughtStore, MODULE_META } from '../store/thoughtStore';
 import { startPolling, stopPolling } from '../services/thoughtService';
@@ -16,6 +17,10 @@ export default function ThoughtStream() {
   const entries = useThoughtStore((s) => s.entries);
   const latestModules = useThoughtStore((s) => s.latestModules);
   const pollingRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const translateY = useRef(0);
+  const rafRef = useRef<number>(0);
 
   // 首次挂载时启动 M6-M8 轮询
   useEffect(() => {
@@ -25,6 +30,31 @@ export default function ThoughtStream() {
     }
     return () => stopPolling();
   }, []);
+
+  // 无缝循环滚动：复制一份内容 = 双倍高度
+  // translateY 从 0 到 -50%，瞬间归零（内容相同，视觉无缝）
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || entries.length === 0) return;
+    // 用 requestAnimationFrame 驱动 transform
+    const speed = 0.006; // px/frame ≈ 极慢流淌
+
+    const tick = () => {
+      if (!el) { rafRef.current = requestAnimationFrame(tick); return; }
+      if (!isPaused) {
+        translateY.current -= speed;
+        // 当第一份完全移出（-50%），瞬间归零
+        if (translateY.current <= -50) {
+          translateY.current = 0;
+        }
+        el.style.transform = `translateY(${translateY.current}%)`;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [entries, isPaused]);
 
   const hasData = entries.length > 0;
 
@@ -58,7 +88,11 @@ export default function ThoughtStream() {
         })}
       </div>
 
-      <div className="thought-list">
+      <div
+        className="thought-list"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
         {!hasData && (
           <div className="thought-empty">
             <span className="thought-empty-icon">◇</span>
@@ -70,18 +104,16 @@ export default function ThoughtStream() {
           </div>
         )}
 
-        <AnimatePresence initial={false}>
-          {entries.map((entry) => {
+        {/* 双倍内容实现无缝循环 */}
+        <div className="thought-stream-track" ref={scrollRef}>
+          {[...entries, ...entries].map((entry, idx) => {
             const meta = MODULE_META[entry.module];
             return (
               <motion.div
-                key={entry.id}
+                key={`${entry.id}-${idx}`}
                 className="thought-item"
-                initial={{ opacity: 0, x: 40, height: 0 }}
+                initial={false}
                 animate={{ opacity: 1, x: 0, height: 'auto' }}
-                exit={{ opacity: 0, x: 40, height: 0 }}
-                transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-                layout
                 style={{ borderLeftColor: meta?.color || '#00ffff55' }}
               >
                 <div className="thought-header">
@@ -116,7 +148,7 @@ export default function ThoughtStream() {
               </motion.div>
             );
           })}
-        </AnimatePresence>
+        </div>
       </div>
     </div>
   );

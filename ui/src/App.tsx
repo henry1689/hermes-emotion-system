@@ -1,8 +1,8 @@
 /**
- * App — 主布局
+ * App — 文曲星 · 全息交互终端
  *
- * 三栏结构：左（状态监控）+ 中（3D 核心）+ 右（思维流）
- * 背景 #050505，青橙高对比配色
+ * 非对称布局：左侧灵魂控制台(25%) + 右侧沉浸交互区(75%)
+ * 背景 #050505，邻近色切割：青碧(左侧) + 冰银(右侧) + 暖金(Logo)
  */
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -10,20 +10,22 @@ import NeuralCore from './components/NeuralCore';
 import StatusPanel from './components/StatusPanel';
 import ThoughtStream from './components/ThoughtStream';
 import ChatPanel from './components/ChatPanel';
+import SettingsDock from './components/SettingsDock';
 import { refreshNeuralData } from './services/neuralDataService';
 import { useNeuralStore } from './store/neuralStore';
+import { useChatStore } from './store/chatStore';
 import './App.css';
 
 export default function App() {
   const setMousePosition = useNeuralStore((s) => s.setMousePosition);
   const setMouseInView = useNeuralStore((s) => s.setMouseInView);
+  const emotionalFlash = useChatStore((s) => s.emotionalFlash);
 
-  // 启动时加载神经数据（优先从 Tauri 后端）
+  // 启动时加载神经数据
   useEffect(() => {
     refreshNeuralData();
   }, []);
 
-  // 全局鼠标追踪（传递给 3D 场景用于交互）
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition(e.clientX, e.clientY);
   };
@@ -35,79 +37,69 @@ export default function App() {
       onMouseEnter={() => setMouseInView(true)}
       onMouseLeave={() => setMouseInView(false)}
     >
-      {/* ===== 3D 背景层 ===== */}
+      {/* ===== 3D 全屏背景 ===== */}
       <div className="canvas-layer">
         <NeuralCore />
       </div>
 
-      {/* ===== 顶部标题 ===== */}
-      <motion.header
-        className="app-header"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+      {/* ===== 左区：灵魂控制台 (25%) ===== */}
+      <motion.aside
+        className={`console-left${emotionalFlash ? ' emotional-warm' : ''}`}
+        initial={{ opacity: 0, x: -30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.2, duration: 0.6 }}
       >
-        <div className="header-left">
-          <span className="logo-icon">◈</span>
+        {/* 顶部：Logo */}
+        <div className="console-logo">
+          <span className="logo-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5D76E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2l1.5 6.5L20 10l-6.5 1.5L12 18l-1.5-6.5L4 10l6.5-1.5z" fill="rgba(245,215,110,0.15)" />
+              <path d="M12 8v8" strokeWidth="1" opacity="0.4" />
+              <path d="M8 12h8" strokeWidth="1" opacity="0.4" />
+            </svg>
+          </span>
           <h1 className="logo-text">
-            Hermes <span className="accent-cyan">Neural</span>
+            <span className="logo-cn">文曲星</span>
+            <span className="logo-en">.WenStar</span>
           </h1>
         </div>
-        <div className="header-right">
-          <span className="header-badge">v0.1.0</span>
-          <span className="header-badge accent-orange">视觉觉醒</span>
-        </div>
-      </motion.header>
 
-      {/* ===== 三栏布局 ===== */}
-      <div className="layout-grid">
-        {/* 左栏：状态监控 */}
-        <motion.aside
-          className="layout-left"
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
-        >
+        {/* 中部：心智流 */}
+        <div className="console-main">
           <StatusPanel />
-        </motion.aside>
+        </div>
 
-        {/* 中栏：3D 核心区（透明 overlay） */}
-        <main className="layout-center">
-          {/* 中心水印提示 */}
-          <div className="center-hint">
-            <span>移动鼠标与神经节点交互</span>
-          </div>
-        </main>
+        {/* 底部：设置舱 */}
+        <SettingsDock />
+      </motion.aside>
 
-        {/* 右栏：思维流 */}
-        <motion.aside
-          className="layout-right"
-          initial={{ opacity: 0, x: 30 }}
-          animate={{ opacity: 1, x: 0 }}
+      {/* ===== 右区：沉浸交互区 (75%) ===== */}
+      <div className="zone-right">
+        {/* 上半：思维流 */}
+        <motion.div
+          className="zone-thoughts"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ delay: 0.4, duration: 0.6 }}
         >
           <ThoughtStream />
-        </motion.aside>
+        </motion.div>
+
+        {/* 下半：对话窗口 */}
+        <motion.div
+          className="zone-chat"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.6 }}
+        >
+          <ChatPanel inline />
+        </motion.div>
       </div>
 
-      {/* ===== 底部状态条 ===== */}
-      <motion.footer
-        className="app-footer"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-      >
-        <span className="footer-left">
-          <span className="status-dot" />
-          Hermes Emotion System · 认知可视化引擎
-        </span>
-        <span className="footer-right">
-          Tauri + React Three Fiber · {new Date().toLocaleTimeString()}
-        </span>
-      </motion.footer>
-
-      {/* ===== 玉瑶聊天面板（浮动 overlay） ===== */}
-      <ChatPanel />
+      {/* 中心水印 */}
+      <div className="center-hint">
+        <span>移动鼠标与神经节点交互</span>
+      </div>
     </div>
   );
 }

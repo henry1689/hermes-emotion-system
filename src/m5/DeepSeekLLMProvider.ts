@@ -88,7 +88,7 @@ export class DeepSeekLLMProvider implements LLMProvider {
     // 注入 M4 检索到的历史记忆摘要（让 LLM 知道我记得什么）
     const hist = params.cognition.history;
     if (hist?.has_relevant_history && hist.summary !== '无相关历史记忆') {
-      contextBlock += `\n[我记得: ${hist.summary}]`;
+      contextBlock += `\n[我记得: 你曾说起过「${hist.summary}」]`;
     }
     // 注入家族关系
     const fam = params.cognition.family;

@@ -1,26 +1,57 @@
 /**
- * StatusPanel — 左栏：状态监控面板
+ * StatusPanel — 玉瑶 · 心智流 (MindStream)
  *
- * 显示系统运行时指标：FPS、粒子数、连接数、后端健康。
+ * 不是监控面板，是她灵魂的窗户。
+ * 四个模块：情绪脉搏 → 心智雷达 → 记忆深海 → 工作记忆流
  */
-import { useEffect } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNeuralStore } from '../store/neuralStore';
+import { useThoughtStore } from '../store/thoughtStore';
+import { useChatStore } from '../store/chatStore';
 import { fetchHealth } from '../services/chatService';
-
-const statusItems = [
-  { key: 'system', label: '系统状态', value: '运行中', color: '#00ff88' },
-  { key: 'mode', label: '运行模式', value: '可视化', color: '#00ffff' },
-  { key: 'backend', label: '后端引擎', value: 'Hermes v0.1', color: '#ff6600' },
-];
+import EmotionalPulse from './EmotionalPulse';
+import CognitiveRadar from './CognitiveRadar';
+import MemoryOcean from './MemoryOcean';
+import WorkingMemoryTicker from './WorkingMemoryTicker';
 
 export default function StatusPanel() {
   const fps = useNeuralStore((s) => s.fps);
-  const particleCount = useNeuralStore((s) => s.particleCount);
-  const connectionCount = useNeuralStore((s) => s.connectionCount);
   const isLoading = useNeuralStore((s) => s.isLoading);
   const backendHealth = useNeuralStore((s) => s.backendHealth);
+  const emotionalFlash = useChatStore((s) => s.emotionalFlash);
   const setBackendHealth = useNeuralStore((s) => s.setBackendHealth);
+
+  const latestThoughts = useThoughtStore((s) => s.latestModules);
+
+  /** 从 M3 数据中提取当前愉悦度和唤醒度 */
+  const [pleasure, setPleasure] = useState(0);
+  const [arousal, setArousal] = useState(0);
+  const [perception, setPerception] = useState<Record<string, number>>({});
+
+  // 从思维流数据更新情绪指标
+  const updateEmotion = useCallback(() => {
+    const m3 = latestThoughts.m3;
+    if (m3?.quadrant1) {
+      const p = m3.quadrant1.find((d: any) => d.key === 'pleasure');
+      const a = m3.quadrant1.find((d: any) => d.key === 'arousal');
+      if (p) setPleasure(p.value);
+      if (a) setArousal(a.value);
+
+      // 收集所有维度用于雷达图
+      const all: Record<string, number> = {};
+      for (const q of ['quadrant1', 'quadrant2', 'quadrant3', 'quadrant4']) {
+        for (const d of m3[q] ?? []) {
+          all[d.key] = d.value;
+        }
+      }
+      setPerception((prev) => ({ ...prev, ...all }));
+    }
+  }, [latestThoughts]);
+
+  useEffect(() => {
+    updateEmotion();
+  }, [updateEmotion]);
 
   // 心跳轮询后端健康
   useEffect(() => {
@@ -38,146 +69,92 @@ export default function StatusPanel() {
   }, [setBackendHealth]);
 
   const isHealthy = backendHealth?.connected !== false && backendHealth !== null;
+  const decay = backendHealth?.memory?.decay;
+  const landmarks = backendHealth?.memory?.landmarks ?? 0;
+  const totalRecords = backendHealth?.storage?.totalRecords ?? backendHealth?.storageRecords ?? 0;
+  const conversationCount = backendHealth?.conversations?.total ?? 0;
 
   const container = {
     hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.1 } },
+    show: { opacity: 1, transition: { staggerChildren: 0.15 } },
   };
 
   const itemAnim = {
-    hidden: { opacity: 0, x: -20 },
-    show: { opacity: 1, x: 0 },
+    hidden: { opacity: 0, y: 15 },
+    show: { opacity: 1, y: 0 },
   };
 
   return (
     <motion.div
-      className="panel status-panel"
+      className="panel status-panel mindstream"
       variants={container}
       initial="hidden"
       animate="show"
     >
-      <motion.h2 className="panel-title" variants={itemAnim}>
-        <span className="accent-cyan">◆</span> 状态监控
-      </motion.h2>
-
-      {/* FPS 仪表 */}
-      <motion.div className="metric-card" variants={itemAnim}>
-        <div className="metric-label">实时帧率</div>
-        <div className="metric-value-row">
-          <span
-            className="metric-value metric-glow"
-            style={{ color: fps >= 55 ? '#00ff88' : fps >= 30 ? '#ffaa00' : '#ff4444' }}
-          >
-            {isLoading ? '--' : fps}
-          </span>
-          <span className="metric-unit">FPS</span>
-        </div>
-        <div className="metric-bar">
-          <motion.div
-            className="metric-bar-fill"
-            style={{ backgroundColor: fps >= 55 ? '#00ff88' : '#ffaa00' }}
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.min((fps / 60) * 100, 100)}%` }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
-      </motion.div>
-
-      {/* 节点统计 */}
-      <motion.div className="metric-card" variants={itemAnim}>
-        <div className="metric-label">神经节点</div>
-        <div className="metric-value-row">
-          <span className="metric-value accent-cyan">{particleCount}</span>
-          <span className="metric-unit">nodes</span>
-        </div>
-      </motion.div>
-
-      <motion.div className="metric-card" variants={itemAnim}>
-        <div className="metric-label">突触连接</div>
-        <div className="metric-value-row">
-          <span className="metric-value accent-orange">{connectionCount}</span>
-          <span className="metric-unit">synapses</span>
-        </div>
-      </motion.div>
-
-      {/* 连接密度 */}
-      <motion.div className="metric-card" variants={itemAnim}>
-        <div className="metric-label">连接密度</div>
-        <div className="metric-value-row">
-          <span className="metric-value" style={{ color: '#8888ff' }}>
-            {particleCount > 0
-              ? ((connectionCount / ((particleCount * (particleCount - 1)) / 2)) * 100).toFixed(2)
-              : '0.00'}
-          </span>
-          <span className="metric-unit">%</span>
-        </div>
-      </motion.div>
-
-      {/* 分割线 */}
-      <motion.div className="divider" variants={itemAnim} />
-
-      {/* 后端健康卡片 */}
-      <motion.div className="metric-card" variants={itemAnim}
-        style={{ borderColor: isHealthy ? 'rgba(0,255,136,0.15)' : 'rgba(255,68,68,0.2)' }}
-      >
-        <div className="metric-label">后端连接</div>
-        <div className="metric-value-row" style={{ gap: 8 }}>
-          <span className="status-dot" style={{
-            background: isHealthy ? '#00ff88' : '#ff4444',
-            boxShadow: isHealthy ? '0 0 6px rgba(0,255,136,0.5)' : '0 0 6px rgba(255,68,68,0.5)',
-          }} />
-          <span className="metric-value" style={{
-            fontSize: 16,
-            color: isHealthy ? '#00ff88' : '#ff4444',
-          }}>
-            {isHealthy ? '已连接' : '离线'}
-          </span>
-        </div>
-        {backendHealth && (
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <div className="status-row" style={{ padding: 0 }}>
-              <span className="status-label">内存</span>
-              <span className="status-value" style={{ color: '#888' }}>
-                {backendHealth.memory?.heapUsedMB ?? '?'}MB / {backendHealth.memory?.heapTotalMB ?? '?'}MB
-              </span>
-            </div>
-            <div className="status-row" style={{ padding: 0 }}>
-              <span className="status-label">存储记录</span>
-              <span className="status-value" style={{ color: '#888' }}>
-                {backendHealth.storageRecords ?? backendHealth.storage?.totalRecords ?? 0} 条
-              </span>
-            </div>
-            <div className="status-row" style={{ padding: 0 }}>
-              <span className="status-label">对话轮次</span>
-              <span className="status-value" style={{ color: '#888' }}>
-                {backendHealth.conversations?.total ?? 0}
-              </span>
+      {/* ── 顶部：状态标题 ── */}
+      <motion.div className="mindstream-header" variants={itemAnim}>
+        <div className="ms-title">
+          <span className="ms-avatar">💠</span>
+          <div>
+            <div className="ms-name">玉瑶</div>
+            <div className="ms-subtitle">
+              <span
+                className="ms-status-dot"
+                style={{ background: isHealthy ? '#00ff88' : '#ff4444' }}
+              />
+              {isHealthy ? '心智活跃' : '离线'}
             </div>
           </div>
-        )}
+        </div>
+        <div className="ms-fps">{isLoading ? '--' : fps}<span className="ms-fps-unit">FPS</span></div>
       </motion.div>
 
-      {/* 系统信息 */}
-      {statusItems.map((item) => (
-        <motion.div className="status-row" key={item.key} variants={itemAnim}>
-          <span className="status-label">{item.label}</span>
-          <span className="status-value" style={{ color: item.color }}>
-            {item.value}
-          </span>
-        </motion.div>
-      ))}
+      {/* ── ① 情绪脉搏 ── */}
+      <motion.div variants={itemAnim}>
+        <EmotionalPulse
+          pleasure={pleasure}
+          arousal={arousal}
+          active={isHealthy}
+        />
+      </motion.div>
 
-      {/* 加载指示器 */}
-      {isLoading && (
-        <motion.div
-          className="loading-indicator"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <span className="loading-dot" />
-          加载神经数据...
-        </motion.div>
-      )}
+      <div className="divider" />
+
+      {/* ── ② 心智雷达 ── */}
+      <motion.div variants={itemAnim}>
+        <CognitiveRadar perception={perception} />
+      </motion.div>
+
+      <div className="divider" />
+
+      {/* ── ③ 记忆深海 ── */}
+      <motion.div variants={itemAnim}>
+        <MemoryOcean
+          decayStats={decay ? { avgStrength: decay.avgStrength, strongCount: decay.strongCount, weakCount: decay.weakCount } : undefined}
+          landmarkCount={landmarks}
+          totalRecords={totalRecords}
+          flash={emotionalFlash}
+        />
+      </motion.div>
+
+      <div className="divider" />
+
+      {/* ── 连接状态（极简指标行） ── */}
+      <motion.div className="ms-metrics" variants={itemAnim}>
+        <span style={{ color: '#888' }}>
+          {totalRecords} 记忆 · {conversationCount} 对话
+        </span>
+        <span style={{ color: isHealthy ? '#00ff88' : '#ff4444', fontSize: 10 }}>
+          {isHealthy ? '● 在线' : '● 离线'}
+        </span>
+      </motion.div>
+
+      <div className="divider" />
+
+      {/* ── ④ 工作记忆流 ── */}
+      <motion.div variants={itemAnim}>
+        <WorkingMemoryTicker active={isHealthy} />
+      </motion.div>
     </motion.div>
   );
 }

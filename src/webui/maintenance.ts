@@ -51,6 +51,8 @@ export interface MaintenanceConfig {
   compactionInterval: number;
   /** 存储 GC 间隔 (ms) — 默认 30 分钟 */
   gcInterval: number;
+  /** 记忆衰减维护间隔 (ms) — 默认 15 分钟 */
+  decayInterval: number;
   /** 对话历史超过此数量触发压缩 */
   compactionThreshold: number;
   /** 压缩后保留的完整对话轮数 */
@@ -66,6 +68,7 @@ export interface MaintenanceConfig {
 const DEFAULT_CONFIG: MaintenanceConfig = {
   compactionInterval: 5 * 60 * 1000,      // 5 分钟
   gcInterval: 30 * 60 * 1000,             // 30 分钟
+  decayInterval: 15 * 60 * 1000,          // 15 分钟
   compactionThreshold: 40,                 // 40 轮触发压缩
   keepFullTurns: 20,                       // 保留最近 20 轮完整
   maxStorageRecords: 500,                  // M2 最多 500 条
@@ -91,6 +94,7 @@ export class MaintenanceService {
 
   private compactionTimer: ReturnType<typeof setInterval> | null = null;
   private gcTimer: ReturnType<typeof setInterval> | null = null;
+  private decayTimer: ReturnType<typeof setInterval> | null = null;
 
   // 外部依赖（由 server.ts 注入）
   private conversationHistory: ConversationTurn[] = [];
@@ -98,6 +102,7 @@ export class MaintenanceService {
   private setConversationHistory: (h: ConversationTurn[]) => void = () => {};
   private saveConversationHistory: () => void = () => {};
   private storage: AnyStorage | null = null;
+  private runDecay: () => { total: number; archived: number } = () => ({ total: 0, archived: 0 });
 
   constructor(config?: Partial<MaintenanceConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -113,6 +118,8 @@ export class MaintenanceService {
     setConversationHistory: (h: ConversationTurn[]) => void;
     saveConversationHistory: () => void;
     storage: AnyStorage | (() => AnyStorage);
+    /** 记忆衰减维护函数 */
+    runDecay?: () => { total: number; archived: number };
   }): void {
     this.conversationHistory = deps.conversationHistory;
     this.getConversationHistory = deps.getConversationHistory;
@@ -124,6 +131,7 @@ export class MaintenanceService {
       // getter — 保存原始 getter，runGC 时动态取值
       this._storageGetter = deps.storage as () => AnyStorage;
     }
+    if (deps.runDecay) this.runDecay = deps.runDecay;
   }
 
   private _storageGetter: (() => AnyStorage) | null = null;
@@ -147,14 +155,27 @@ export class MaintenanceService {
       );
     }, this.config.gcInterval);
 
+    // 记忆衰减定时器（15 分钟）
+    this.decayTimer = setInterval(() => {
+      const result = this.runDecay();
+      if (result.total > 0) {
+        console.log(`[Maintenance] 衰减维护: ${result.total}条, ${result.archived}条归档`);
+      }
+    }, this.config.decayInterval);
+
     // 首轮尽快执行
     setTimeout(() => this.runCompaction().catch(() => {}), 30_000);
     setTimeout(() => this.runGC().catch(() => {}), 60_000);
+    setTimeout(() => {
+      const result = this.runDecay();
+      console.log(`[Maintenance] 首轮衰减: ${result.total}条, ${result.archived}条归档`);
+    }, 90_000);
   }
 
   stop(): void {
     if (this.compactionTimer) clearInterval(this.compactionTimer);
     if (this.gcTimer) clearInterval(this.gcTimer);
+    if (this.decayTimer) clearInterval(this.decayTimer);
     console.log('[Maintenance] 维护引擎已停止');
   }
 

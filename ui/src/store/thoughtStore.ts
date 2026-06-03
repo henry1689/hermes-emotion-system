@@ -73,4 +73,6 @@ export const MODULE_META: Record<string, { name: string; color: string; icon: st
   M6: { name: '自我模型', color: '#00ff88', icon: '🧠' },
   M7: { name: '梦境队列', color: '#aa66ff', icon: '🌙' },
   M8: { name: '年轮记录', color: '#ff4466', icon: '🌲' },
+  IN: { name: '玉瑶感悟', color: '#ff88aa', icon: '💭' },
+  RE: { name: '关系图', color: '#88ffaa', icon: '🔗' },
 };
