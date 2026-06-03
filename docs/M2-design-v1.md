@@ -1,11 +1,54 @@
 # M2 5大语义区存储适配器 · 设计文档
 
-> **文档状态**: Final — 已签署（含架构纠偏修正）  
+> **文档状态**: **ARCHIVED** — 设计已实现，模块已退役  
+> **替代者**: `src/fusion/FusionStorageAdapter`（融合存储，24D 情感向量作为主索引）  
 > **关联规格书**: `docs/project-spec-v1.md` §4  
 > **关联 ADR**: ADR-004 (M1-M2边界), ADR-002 (分类树), **ADR-006 (本体-标签分离)**  
 > **版本**: **v1.0-final**  
 > **前置模块**: M1 DNAEncoder (已完成)  
-> **变更记录**: v1.0 初始设计 → v1.1 架构纠偏：24维情绪向量 → `emotion_color` 色号标签，更新 §4.1 描述
+> **变更记录**: v1.0 初始设计 → v1.1 架构纠偏：24维情绪向量 → `emotion_color` 色号标签，更新 §4.1 描述  
+> **归档记录 (2026-06-04)**: 本设计已由 `src/fusion/FusionStorageAdapter` 完整继承并增强。"24D 情感向量"不再以 `emotion_color` 标签形式附加在 DNA 上，而是作为 `perception: Perception24D` 成为每一条记忆记录的主索引——这正是本设计开放接口的初衷，8 个方法的抽象能力经由 FusionStorageAdapter 在 SQLite 中获得了完整的实现。
+
+---
+
+## 模块现状
+
+**M2 (`src/m2/`) 当前处于退役状态。** 2026-06-04 的架构清洗中，旧 M2 的所有生产引用已迁移到融合存储：
+
+| 旧 M2 产物 | 迁移目标 | 说明 |
+|:---|:---|:---|
+| `JsonStorageAdapter` | `FusionStorageAdapter` (`src/fusion/`) | SQLite 主存储 + JSON Zone 备份 |
+| `StorageAdapter` 接口 | `fusion/types` 中的 24D 增强版类型 | `WriteResult`/`QueryOptions`/`StorageStatus` 已迁移 |
+| `write(dna)` 单参数 | `write(dna, perception)` 双参数 | 24D 情感向量作为强类型第二参数 |
+| `findByLocus` / `findBySeqPosRange` | `findByEmotionalSimilarity` / `findBySeqPosRangeWithStrength` | 24D 向量检索 + 衰减门控 |
+| 5 个 JSON Zone 文件 | SQLite 6 表 (`memories`/`entities`/`memory_entities`/`entity_relations`/`inductions`/`decay_log`) | 索引化、事务性存储 |
+| 旧 SELF 硬编码 | `M6Orchestrator` 动态读取 | 自我模型从 `data/self_model.json` 实时加载 |
+
+**当前仍然引用 `src/m2/` 的文件**：
+- `src/webui/maintenance.ts` — 仅在注释中引用 `JsonStorageAdapter`，实际运行时指向 `FusionStorageAdapter`
+- `src/cli/sandbox.ts` — 已改用 `FusionStorageAdapter`（2026-06-04 迁移）
+- `src/__tests__/e2e.test.ts` — 已改用 `FusionStorageAdapter`（2026-06-04 迁移）
+
+### 迁移后架构对比
+
+```
+旧架构 (v1.0):
+  M1 DNA → M2.write(dna) → JSON Zone (文本+实体+话题路径)
+                                            ↓
+                                  M3 24D 感知 → 丢弃 ❌
+                                            ↓
+                                  M4 findByLocus (仅话题关键词)
+
+新架构 (v2.0):
+  M1 DNA → M3 感知 (24D) → FusionStorageAdapter.write(dna, perception)
+                                            ↓
+                               ┌── SQLite.memories (perception_json + 所有字段)
+                               └── JSON Zone (备份)
+                                            ↓
+                               findByEmotionalSimilarity (24D 加权余弦)
+```
+
+**本设计文档保留作为历史参考**，所有新开发请参阅 `src/fusion/FusionStorageAdapter.ts` 和 `src/fusion/types/index.ts`。
 
 ---
 

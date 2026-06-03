@@ -131,7 +131,7 @@ async function initPipeline(): Promise<void> {
   await storage.initialize();
   familyGraph = new FamilyGraph(DB_PATH);
   await familyGraph.initialize();
-  m4 = new M4Orchestrator(storage as any, familyGraph); // FusionStorageAdapter 兼容 StorageAdapter 接口
+  m4 = new M4Orchestrator(storage, familyGraph);
   await m4.initialize();
   m3 = new M3LogicOrchestrator();
   m5 = new M5Orchestrator(new DeepSeekLLMProvider());

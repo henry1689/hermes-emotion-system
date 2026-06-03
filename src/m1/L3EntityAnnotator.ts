@@ -1,7 +1,13 @@
-// Ref: ARCH.md §3.1 L3 实体基因槽 — entity_genes
-// Ref: ARCH.md §4.2 编码时 entity_genes 标注 phenotype / knowledge_type
-// Ref: 设计意图宣言 §4 AI自我模型四大支柱
-
+/**
+ * L3EntityAnnotator — 实体基因槽标注器
+ *
+ * 使用 FMM（正向最大匹配）分词 + 规则匹配提取实体。
+ * 最小语义单位原则：禁止单字子串匹配，防止中文多字误报。
+ *
+ * Ref: ARCH.md §3.1 L3 实体基因槽
+ * Ref: ARCH.md §4.2 编码时 entity_genes 标注 phenotype / knowledge_type
+ * Ref: 设计意图宣言 §4 AI自我模型四大支柱
+ */
 import type {
   EntityGene,
   EntityType,
@@ -10,17 +16,18 @@ import type {
   SelfModelV1,
 } from './types/dna.js';
 
+// ──────────────────────────────────────────────
+// 实体规则
+// ──────────────────────────────────────────────
+
 /**
  * 实体提取规则：带规范化名称的匹配规则
- * 每个规则包含：
- * - name: 规范化后的实体名称（DNA中存储的值）
- * - type: 实体类型
- * - patterns: 在输入文本中匹配的关键词（匹配任意一个即触发）
- * Ref: ARCH.md §4.2 确定性路由
+ * 每条规则在 FMM 分词后的 token 中进行匹配（不是子串匹配）。
  */
 interface NormalizedEntityRule {
   name: string;
   type: EntityType;
+  /** 匹配关键词（FMM 词典据此构建，单字仅保留"我"） */
   patterns: string[];
 }
 
@@ -29,8 +36,8 @@ const ENTITY_EXTRACTION_RULES: NormalizedEntityRule[] = [
   { name: '我', type: 'self', patterns: ['我'] },
 
   // ── Person — 亲属关系 ──
-  { name: '妈妈', type: 'person', patterns: ['妈妈', '妈'] },
-  { name: '爸爸', type: 'person', patterns: ['爸爸', '爸'] },
+  { name: '妈妈', type: 'person', patterns: ['妈妈'] },
+  { name: '爸爸', type: 'person', patterns: ['爸爸'] },
   { name: '母亲', type: 'person', patterns: ['母亲'] },
   { name: '父亲', type: 'person', patterns: ['父亲'] },
   { name: '爷爷', type: 'person', patterns: ['爷爷'] },
@@ -72,11 +79,10 @@ const ENTITY_EXTRACTION_RULES: NormalizedEntityRule[] = [
   { name: '失落', type: 'emotion', patterns: ['失落'] },
   { name: '崩溃', type: 'emotion', patterns: ['崩溃'] },
   { name: '愤怒', type: 'emotion', patterns: ['愤怒', '生气'] },
-  { name: '烦躁', type: 'emotion', patterns: ['烦躁', '烦'] },
+  { name: '烦躁', type: 'emotion', patterns: ['烦躁'] },
   { name: '害怕', type: 'emotion', patterns: ['害怕'] },
   { name: '紧张', type: 'emotion', patterns: ['紧张'] },
   { name: '喜欢', type: 'emotion', patterns: ['喜欢'] },
-  { name: '爱', type: 'emotion', patterns: ['爱'] },
 
   // ── Event ──
   { name: '结婚', type: 'event', patterns: ['结婚'] },
@@ -88,9 +94,9 @@ const ENTITY_EXTRACTION_RULES: NormalizedEntityRule[] = [
   { name: '吵架', type: 'event', patterns: ['吵架', '争吵'] },
   { name: '分手', type: 'event', patterns: ['分手'] },
   { name: '约会', type: 'event', patterns: ['约会'] },
+  { name: '加班', type: 'event', patterns: ['加班'] },
 
   // ── Place ──
-  { name: '家', type: 'place', patterns: ['家'] },
   { name: '公司', type: 'place', patterns: ['公司', '办公室'] },
   { name: "北京", type: "place", patterns: ["北京"] },
   { name: "上海", type: "place", patterns: ["上海"] },
@@ -99,15 +105,14 @@ const ENTITY_EXTRACTION_RULES: NormalizedEntityRule[] = [
   // ── Object ──
   { name: '礼物', type: 'object', patterns: ['礼物'] },
   { name: '宠物', type: 'object', patterns: ['猫', '狗', '宠物'] },
-  { name: '花', type: 'object', patterns: ['花'] },
-  { name: '书', type: 'object', patterns: ['书'] },
-  { name: '加班', type: 'object', patterns: ['加班'] },
-  { name: '累', type: 'event', patterns: ['累', '好累', '太累了', '累坏了'] },
   { name: '压力', type: 'event', patterns: ['压力', '压力大'] },
   { name: '失眠', type: 'event', patterns: ['失眠', '睡不好', '睡不着'] },
   { name: '跑步', type: 'object', patterns: ['跑步', '晨跑', '夜跑'] },
   { name: '散步', type: 'object', patterns: ['散步', '遛弯', '走走'] },
   { name: '咖啡', type: 'object', patterns: ['咖啡', '喝咖啡'] },
+
+  // ── 情绪/状态型 event ──
+  { name: '累', type: 'emotion', patterns: ['好累', '太累了', '累坏了'] },
 
   // ── Hobby / Creativity ──
   { name: '画画', type: 'object', patterns: ['画画', '画国画', '画山水', '画人物', '绘画', '作画'] },
@@ -119,9 +124,69 @@ const ENTITY_EXTRACTION_RULES: NormalizedEntityRule[] = [
   { name: '烹饪', type: 'object', patterns: ['烹饪', '做饭', '做菜', '厨艺', '烘焙'] },
 ];
 
+// 已删除的单字规则（因 FMM 匹配后仍会产生单字误报）：
+// - '家'(place) — 国家/大家/专家 误报
+// - '花'(object) — 花园/花生/花费 误报
+// - '书'(object) — 书店/书法/秘书 误报
+
+// ──────────────────────────────────────────────
+// 中文正向最大匹配分词器
+// ──────────────────────────────────────────────
+
+/**
+ * 正向最大匹配 (FMM) 中文分词器
+ *
+ * 词典基于 ENTITY_EXTRACTION_RULES 的 pattern 自动构建。
+ * 以最长匹配优先原则确保复合词被整体识别。
+ */
+class ChineseSegmenter {
+  private dict: string[] = [];
+  private maxLen = 0;
+
+  constructor(rules: NormalizedEntityRule[]) {
+    const allPatterns = rules.flatMap(r => r.patterns);
+    const unique = [...new Set(allPatterns)];
+    // 按长度降序排列（FMM 核心 — 最长词优先）
+    this.dict = unique.sort((a, b) => b.length - a.length || a.localeCompare(b));
+    this.maxLen = Math.max(...this.dict.map(s => s.length), 1);
+  }
+
+  /**
+   * 正向最大匹配分词
+   * 从文本开头开始，每次尝试匹配词典中最长的词。
+   */
+  segment(text: string): string[] {
+    const tokens: string[] = [];
+    let i = 0;
+    while (i < text.length) {
+      let matched = false;
+      const lookahead = Math.min(this.maxLen, text.length - i);
+      for (let len = lookahead; len >= 1; len--) {
+        const candidate = text.substring(i, i + len);
+        if (this.dict.includes(candidate)) {
+          tokens.push(candidate);
+          i += len;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        // 未匹配的单字直接作为原子 token 加入
+        // 后续实体提取时，非"我"的单字 token 不会被匹配为实体
+        tokens.push(text[i]);
+        i++;
+      }
+    }
+    return tokens;
+  }
+}
+
+// ──────────────────────────────────────────────
+// 情感极性词表
+// ──────────────────────────────────────────────
+
 /**
  * 情感极性词表，用于 phenotype 标注
- * 当实体与正面词共现时标注 enhance，与负面词共现时标注 conflict
  */
 export const POSITIVE_WORDS = new Set([
   '开心', '快乐', '幸福', '感动', '兴奋', '满足', '温暖',
@@ -136,22 +201,38 @@ export const NEGATIVE_WORDS = new Set([
   '烦', '累', '难', '差', '糟', '失败', '压力',
 ]);
 
+// ──────────────────────────────────────────────
+// 实体提取器（基于 FMM 分词）
+// ──────────────────────────────────────────────
+
 /**
- * 简单的规则式命名实体识别器
- * 提取文本中匹配预定义模式的实体
- * Ref: ARCH.md §4.2 三源融合 — 写入时实体提取
+ * 基于 FMM 分词的命名实体识别器
+ *
+ * 匹配方式：对输入文本做 FMM 分词 → 检查 token 是否匹配规则中的 pattern
+ * 与旧版差异：旧版用 text.includes(pattern) 做子串匹配，
+ * 单字规则会在"国家"→"家"、"花园"→"花"等场景产生大量误报。
+ * 新版基于 token 的精确匹配彻底消除此问题。
  */
-class SimpleEntityExtractor {
+class TokenBasedEntityExtractor {
+  private segmenter: ChineseSegmenter;
+  private rules: NormalizedEntityRule[];
+
+  constructor(rules: NormalizedEntityRule[]) {
+    this.rules = rules;
+    this.segmenter = new ChineseSegmenter(rules);
+  }
+
   extract(text: string): Array<{ name: string; type: EntityType; allele: string }> {
     const found: Array<{ name: string; type: EntityType; allele: string }> = [];
-    const seen = new Set<string>(); // 去重（按规范化名称+类型）
+    const seen = new Set<string>();
 
-    const lowerText = text.toLowerCase();
+    // FMM 分词
+    const tokens = this.segmenter.segment(text.toLowerCase());
 
-    for (const rule of ENTITY_EXTRACTION_RULES) {
-      // 检查是否有任意模式匹配
+    for (const rule of this.rules) {
+      // 检查 token 列表中是否有任意 pattern 匹配
       const matchedPattern = rule.patterns.find((pat) =>
-        lowerText.includes(pat.toLowerCase())
+        tokens.includes(pat.toLowerCase())
       );
 
       if (matchedPattern) {
@@ -161,7 +242,7 @@ class SimpleEntityExtractor {
           found.push({
             name: rule.name,
             type: rule.type,
-            allele: matchedPattern, // 实际匹配的文本片段
+            allele: matchedPattern,
           });
         }
       }
@@ -171,11 +252,15 @@ class SimpleEntityExtractor {
   }
 }
 
+// ──────────────────────────────────────────────
+// L3 实体标注器
+// ──────────────────────────────────────────────
+
 /**
  * L3 实体标注器
  *
  * 使用规则驱动的方式完成：
- * 1. NER 实体提取（关键词模式匹配）
+ * 1. NER 实体提取（FMM 分词 + 关键词模式匹配）
  * 2. phenotype 标注（基于情感极性 + 自我模型比对）
  * 3. knowledge_type 分类（默认private，特定类型映射到family/world）
  *
@@ -183,18 +268,10 @@ class SimpleEntityExtractor {
  * Ref: 架构决策备忘录 v1.1 — 禁止LLM介入
  */
 export class L3EntityAnnotator {
-  private extractor = new SimpleEntityExtractor();
+  private extractor = new TokenBasedEntityExtractor(ENTITY_EXTRACTION_RULES);
 
   /**
    * 判断实体的 phenotype（对自我模型的影响方向）
-   *
-   * 策略：
-   * 1. 如果实体在上下文中与正面情感词共现 → enhance
-   * 2. 如果与负面情感词共现 → conflict
-   * 3. 如果实体与self_model.narrative_identity一致 → enhance
-   * 4. 其他情况 → neutral
-   *
-   * Ref: 设计意图宣言 §4 AI自我模型四大支柱 — 核心特质
    */
   private determinePhenotype(
     entityName: string,
@@ -202,18 +279,14 @@ export class L3EntityAnnotator {
     context: string,
     selfModel: SelfModelV1
   ): PhenotypeLabel {
-    // self 实体特殊处理：检查是否与自我叙事一致
     if (entityType === 'self') {
-      // 如果上下文包含强烈的负面情绪，self表达可能处于冲突状态
       const hasStrongNegative = [...NEGATIVE_WORDS].some((w) => context.includes(w));
       const hasStrongPositive = [...POSITIVE_WORDS].some((w) => context.includes(w));
-
       if (hasStrongNegative && !hasStrongPositive) return 'conflict';
       if (hasStrongPositive && !hasStrongNegative) return 'enhance';
       return 'neutral';
     }
 
-    // 检查上下文中的情感词
     const contextLower = context.toLowerCase();
     let positiveCount = 0;
     let negativeCount = 0;
@@ -228,7 +301,6 @@ export class L3EntityAnnotator {
     if (positiveCount > negativeCount) return 'enhance';
     if (negativeCount > positiveCount) return 'conflict';
 
-    // 检查边界：如果实体触发了 self_model 的边界
     for (const boundary of selfModel.boundaries) {
       if (contextLower.includes(boundary.toLowerCase())) {
         return 'conflict';
@@ -240,16 +312,8 @@ export class L3EntityAnnotator {
 
   /**
    * 确定 knowledge_type（知识源类型）
-   *
-   * 策略：
-   * - family: 家庭成员、家庭事件
-   * - world: 公共地名、公共人物
-   * - private: 其他（默认）
-   *
-   * Ref: ARCH.md §4.1 三源定义
    */
   private determineKnowledgeType(entityType: EntityType, entityName: string): 'private' | 'family' | 'world' {
-    // family 类型
     if (entityType === 'person') {
       const familyKeywords = [
         '妈妈', '母亲', '爸', '爸爸', '父亲',
@@ -264,7 +328,6 @@ export class L3EntityAnnotator {
       }
     }
 
-    // world 类型
     if (entityType === 'place') {
       const worldPlaces = ['北京', '上海', '深圳', '广州', '杭州', '中国', '美国'];
       if (worldPlaces.includes(entityName)) {
@@ -277,11 +340,6 @@ export class L3EntityAnnotator {
 
   /**
    * 对输入文本进行L3实体标注
-   *
-   * @param text 用户输入文本
-   * @param context 当前对话上下文的文本（用于phenotype判断）
-   * @param selfModel 当前自我模型
-   * @returns L3标注结果
    */
   annotate(
     text: string,

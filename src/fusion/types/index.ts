@@ -117,3 +117,57 @@ export interface InductionSummary {
   dominant_mood: Perception24D | null;
   trait_updates: Record<string, number> | null;
 }
+
+// ════════════════════════════════════════════════════════════
+// 24D 存储契约 —— 取代旧 M2 StorageAdapter/WriteResult/QueryOptions
+// 从此存储接口不再是"文本归档接口"，而是"24D 生命状态写入接口"
+// ════════════════════════════════════════════════════════════
+
+/** 写入结果 */
+export interface WriteResult {
+  success: boolean;
+  real_ref: string;
+  seq_pos: number;
+  error?: string;
+}
+
+/** 读取结果 */
+export interface ReadResult {
+  dna?: any;
+  error?: string;
+}
+
+/**
+ * 查询选项（24D 增强版）
+ * 支持按情感相似度、特定维度阈值、钙化等级进行检索
+ */
+export interface QueryOptions {
+  limit?: number;
+  offset?: number;
+  ascending?: boolean;
+
+  /** 24D: 感知向量过滤 —— 按情感相似度检索 */
+  perception_filter?: Perception24D;
+  /** 24D: 相似度检索模式 */
+  similarity_mode?: SimilarityMode;
+  /** 24D: 情感相似度阈值 (0-1) */
+  similarity_threshold?: number;
+
+  /** 24D: 按钙化等级过滤 */
+  min_calcium_level?: 0 | 1 | 2 | 3;
+  /** 24D: 按记忆强度过滤 */
+  min_strength?: number;
+
+  /** 话题前缀过滤 */
+  locus_path?: string;
+  /** 实体名称列表（用于多跳检索） */
+  entity_names?: string[];
+}
+
+/** 存储状态 */
+export interface StorageStatus {
+  totalRecords: number;
+  zoneCounts: Record<string, number>;
+  currentSeqPos: number;
+  storagePath: string;
+}

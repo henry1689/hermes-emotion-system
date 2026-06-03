@@ -17,7 +17,7 @@ import { mkdirSync, existsSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DNAEncoder } from '../m1/DNAEncoder.js';
-import { JsonStorageAdapter } from '../m2/JsonStorageAdapter.js';
+import { FusionStorageAdapter } from '../fusion/FusionStorageAdapter.js';
 import { M3LogicOrchestrator } from '../m3/M3LogicOrchestrator.js';
 import { M4Orchestrator } from '../m4/M4Orchestrator.js';
 import { M5Orchestrator } from '../m5/M5Orchestrator.js';
@@ -38,7 +38,7 @@ const SELF: SelfModelV1 = {
 };
 
 let encoder: DNAEncoder;
-let storage: JsonStorageAdapter;
+let storage: FusionStorageAdapter;
 let m3: M3LogicOrchestrator;
 let familyGraph: FamilyGraph;
 let m4: M4Orchestrator;
@@ -49,7 +49,7 @@ async function init(): Promise<void> {
   if (existsSync(TMP_DIR)) rmSync(TMP_DIR, { recursive: true, force: true });
   mkdirSync(TMP_DIR, { recursive: true });
   encoder = new DNAEncoder(SELF);
-  storage = new JsonStorageAdapter(TMP_DIR);
+  storage = new FusionStorageAdapter(TMP_DIR);
   await storage.initialize();
   familyGraph = new FamilyGraph(DB_PATH);
   await familyGraph.initialize();
@@ -69,8 +69,15 @@ async function processInput(text: string): Promise<void> {
     console.log(`      实体: ${dna.entity_genes.map(e => `${e.name}(${e.type})`).join(', ')}`);
   }
 
-  const wr = await storage.write(dna);
-  console.log(`  💾 M2: ref=${wr.real_ref} seq=${wr.seq_pos}`);
+  // 沙盒模式：用中性感知向量写入 Fusion 存储
+  const neutralPerception = {
+    pleasure: 0, arousal: 0.3, dominance: 0, aggression: 0, sincerity: 0.5, humor: 0,
+    factual: 0.5, logical: 0.5, certainty: 0.5, abstract: 0.3, temporal_focus: 0, self_ref: 0.5,
+    intimacy: 0, power_diff: 0, dependency: 0, moral_judgment: 0, etiquette: 0.3, belonging: 0,
+    sexual_attraction: 0, sensory_craving: 0, energy_merge: 0, possessiveness: 0, ecstasy: 0, safety: 0.5,
+  };
+  const wr = await storage.write(dna, neutralPerception);
+  console.log(`  💾 Fusion: ref=${wr.real_ref} seq=${wr.seq_pos}`);
 
   const decision = m3.decide(dna, { current_time: new Date().toISOString(), current_location: '深圳' });
   const p = decision.enhanced.perception;

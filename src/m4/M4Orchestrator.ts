@@ -4,7 +4,7 @@
 import type { M3Decision } from '../m3/types/perception.js';
 import type { M4Context } from './types/index.js';
 import type { ScoredMemory } from '../fusion/types/index.js';
-import type { StorageAdapter } from '../m2/StorageAdapter.js';
+import type { FusionStorageAdapter } from '../fusion/FusionStorageAdapter.js';
 import { MemoryRetriever } from './MemoryRetriever.js';
 import { FamilyGraph } from './FamilyGraph.js';
 
@@ -12,7 +12,7 @@ export class M4Orchestrator {
   private memoryRetriever: MemoryRetriever;
   private familyGraph: FamilyGraph;
 
-  constructor(storage: StorageAdapter, familyGraph?: FamilyGraph) {
+  constructor(storage: FusionStorageAdapter, familyGraph?: FamilyGraph) {
     this.memoryRetriever = new MemoryRetriever(storage);
     this.familyGraph = familyGraph ?? new FamilyGraph();
   }

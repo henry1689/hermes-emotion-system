@@ -43,13 +43,20 @@ interface KeywordRule {
 }
 const KEYWORD_RULES = loadL0Rules();
 
+/** 内存缓存的分类树（惰性加载） */
+let cachedTaxonomy: TaxonomyTree | null = null;
+
 /**
  * 加载认知分类树
- * 外部可注入自定义路径，默认从config目录加载
- * 文件缺失时使用内存默认树（不崩溃）
+ * 内部使用惰性缓存：首次加载后缓存到内存，后续调用直接返回缓存。
+ * 外部可注入自定义路径覆盖缓存，默认从config目录加载。
+ * 文件缺失时使用内存默认树（不崩溃）。
  * Ref: ARCH.md §4.2 确定性路由，架构决策备忘录 v1.2
  */
 export function loadTaxonomy(customPath?: string): TaxonomyTree {
+  // 无自定义路径且缓存命中 → 直接返回
+  if (!customPath && cachedTaxonomy) return cachedTaxonomy;
+
   const targetPath = customPath ?? DEFAULT_TAXONOMY_PATH;
   try {
     if (!existsSync(targetPath)) {
@@ -64,6 +71,8 @@ export function loadTaxonomy(customPath?: string): TaxonomyTree {
       throw new Error('Invalid taxonomy structure: missing version or tree');
     }
 
+    // 仅缓存默认路径的加载结果
+    if (!customPath) cachedTaxonomy = taxonomy;
     return taxonomy;
   } catch (err) {
     console.warn(`[L0Router] Failed to load taxonomy: ${err instanceof Error ? err.message : String(err)}`);
@@ -71,19 +80,16 @@ export function loadTaxonomy(customPath?: string): TaxonomyTree {
   }
 }
 
+/** 清除分类树缓存（用于测试热更新） */
+export function clearTaxonomyCache(): void {
+  cachedTaxonomy = null;
+}
+
 /**
  * 规范化输入文本：转小写、去除多余空白
  */
 function normalizeText(text: string): string {
   return text.trim().replace(/\s+/g, ' ');
-}
-
-/**
- * 检测文本是否包含任意关键词
- */
-function matchesAny(text: string, keywords: string[]): boolean {
-  const lowerText = text.toLowerCase();
-  return keywords.some((kw) => lowerText.includes(kw.toLowerCase()));
 }
 
 /**

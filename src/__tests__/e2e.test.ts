@@ -5,7 +5,18 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { DNAEncoder } from '../m1/DNAEncoder.js';
-import { JsonStorageAdapter } from '../m2/JsonStorageAdapter.js';
+import { FusionStorageAdapter } from '../fusion/FusionStorageAdapter.js';
+import type { Perception24D } from '../m3/types/perception.js';
+
+/** 测试用中性感知向量 */
+function neutralPerception(): Perception24D {
+  return {
+    pleasure: 0, arousal: 0.3, dominance: 0, aggression: 0, sincerity: 0.5, humor: 0,
+    factual: 0.5, logical: 0.5, certainty: 0.5, abstract: 0.3, temporal_focus: 0, self_ref: 0.5,
+    intimacy: 0, power_diff: 0, dependency: 0, moral_judgment: 0, etiquette: 0.3, belonging: 0,
+    sexual_attraction: 0, sensory_craving: 0, energy_merge: 0, possessiveness: 0, ecstasy: 0, safety: 0.5,
+  };
+}
 import { M3LogicOrchestrator } from '../m3/M3LogicOrchestrator.js';
 import { M4Orchestrator } from '../m4/M4Orchestrator.js';
 import { M5Orchestrator } from '../m5/M5Orchestrator.js';
@@ -26,7 +37,7 @@ const TEST_DB = join(TEST_DIR, 'knowledge', 'family_graph.db');
 
 describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
   let encoder: DNAEncoder;
-  let storage: JsonStorageAdapter;
+  let storage: FusionStorageAdapter;
   let m3: M3LogicOrchestrator;
   let familyGraph: FamilyGraph;
   let m4: M4Orchestrator;
@@ -36,7 +47,7 @@ describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
     if (!existsSync(TEST_DIR)) mkdirSync(TEST_DIR, { recursive: true });
     encoder = new DNAEncoder(SELF_MODEL);
 
-    storage = new JsonStorageAdapter(TEST_DIR);
+    storage = new FusionStorageAdapter(TEST_DIR);
     await storage.initialize();
 
     familyGraph = new FamilyGraph(TEST_DB);
@@ -60,7 +71,7 @@ describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
     expect(dna.branch_id).toBeTruthy();
 
     // Step 2: M2 存储
-    const writeResult = await storage.write(dna);
+    const writeResult = await storage.write(dna, neutralPerception());
     expect(writeResult.success).toBe(true);
 
     // Step 3: M3 感知决策
@@ -88,7 +99,7 @@ describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
 
   it('Case 2: 工作压力话题 → 完整流水线可跑通', async () => {
     const dna = encoder.encodeSingle('今天加班到很晚，压力好大');
-    await storage.write(dna);
+    await storage.write(dna, neutralPerception());
 
     const decision = m3.decide(dna);
     const ctx = await m4.orchestrate(decision);
@@ -100,7 +111,7 @@ describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
 
   it('Case 3: 简短输入（粉末级）→ 忽略/简短回应', async () => {
     const dna = encoder.encodeSingle('嗯');
-    await storage.write(dna);
+    await storage.write(dna, neutralPerception());
 
     const decision = m3.decide(dna);
     expect(decision.actions).toContain('ignore');
@@ -115,7 +126,7 @@ describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
   it('Case 4: 家族知识自动推断 + 引入 M5 回应', async () => {
     // 先创建一条含家族关系的对话
     const dna = encoder.encodeSingle('我妈妈叫李华');
-    await storage.write(dna);
+    await storage.write(dna, neutralPerception());
 
     const decision = m3.decide(dna);
     const ctx = await m4.orchestrate(decision);
@@ -131,7 +142,7 @@ describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
 
   it('Case 5: HumanisticCalibrator 降级兜底（模拟 LLM 失效）', async () => {
     const dna = encoder.encodeSingle('我好难过');
-    await storage.write(dna);
+    await storage.write(dna, neutralPerception());
 
     const decision = m3.decide(dna);
     const ctx = await m4.orchestrate(decision);
@@ -151,7 +162,7 @@ describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
     for (const text of inputs) {
       const dna = encoder.encodeSingle(text);
       lastId = dna.branch_id;
-      await storage.write(dna);
+      await storage.write(dna, neutralPerception());
     }
     const stored = await storage.read(lastId);
     expect(stored.dna).not.toBeNull();
@@ -161,7 +172,7 @@ describe('E2E: 完整流水线 M1→M2→M3→M4→M5', () => {
   it('Case 7: 超长文本 → 不崩溃', async () => {
     const longText = '我' + '好'.repeat(500) + '难过';
     const dna = encoder.encodeSingle(longText);
-    await storage.write(dna);
+    await storage.write(dna, neutralPerception());
 
     const decision = m3.decide(dna);
     const ctx = await m4.orchestrate(decision);

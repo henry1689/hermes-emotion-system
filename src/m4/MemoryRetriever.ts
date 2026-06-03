@@ -1,15 +1,15 @@
 // MemoryRetriever — 从 M2 检索历史记忆 + 上下文压缩
 // Ref: M4-design-v1.md §4
 
-import type { StorageAdapter } from '../m2/StorageAdapter.js';
+import type { FusionStorageAdapter } from '../fusion/FusionStorageAdapter.js';
 import type { DNA } from '../m1/types/dna.js';
 import type { MemorySummary, M4Context } from './types/index.js';
 import type { M3Action } from '../m3/types/perception.js';
 
 export class MemoryRetriever {
-  private storage: StorageAdapter;
+  private storage: FusionStorageAdapter;
 
-  constructor(storage: StorageAdapter) {
+  constructor(storage: FusionStorageAdapter) {
     this.storage = storage;
   }
 

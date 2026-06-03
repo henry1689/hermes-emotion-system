@@ -8,7 +8,7 @@
 import type { FusionStorageAdapter } from '../fusion/FusionStorageAdapter.js';
 import type { Perception24D } from '../m3/types/perception.js';
 import type { DNA } from '../m1/types/dna.js';
-import type { WriteResult } from '../m2/types/index.js';
+import type { WriteResult } from '../fusion/types/index.js';
 import { computeCalcium } from '../fusion/math.js';
 
 interface WorkingEntry {

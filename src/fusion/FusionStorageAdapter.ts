@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import type { DNA } from '../m1/types/dna.js';
 import type { Perception24D } from '../m3/types/perception.js';
 import type { EntityGene } from '../m1/types/dna.js';
-import type { WriteResult, ReadResult, QueryOptions, StorageStatus } from '../m2/types/index.js';
+import type { WriteResult, ReadResult, QueryOptions, StorageStatus } from './types/index.js';
 import { SQLiteAdapter } from './SQLiteAdapter.js';
 import { computeCalcium, initialStrength, updateDynamics } from './math.js';
 import type { EmotionalMemoryRecord, RetrievalQuery, ScoredMemory, EmotionalLandscape } from './types/index.js';

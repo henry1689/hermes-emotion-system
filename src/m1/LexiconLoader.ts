@@ -102,21 +102,3 @@ export function loadL0Rules(): Array<{ id: string; keywords: string[]; domain: s
     return l0RulesCache;
   }
 }
-
-/** 清空缓存（用于测试热更新） */
-export function clearLexiconCache(): void {
-  cache.clear();
-  l0RulesCache = [];
-}
-
-/** 获取词表当前版本号 */
-export function getLexiconVersion(): string {
-  try {
-    const path = join(LEXICON_DIR, 'emotion_lexicon.json');
-    if (!existsSync(path)) return 'unknown';
-    const data = JSON.parse(readFileSync(path, 'utf-8'));
-    return data.version ?? 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}

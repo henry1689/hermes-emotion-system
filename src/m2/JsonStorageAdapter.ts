@@ -68,13 +68,15 @@ async function writeJSONAtomic(filePath: string, data: unknown): Promise<void> {
 /**
  * JSON 文件存储适配器
  *
+ * @deprecated 已由 FusionStorageAdapter (src/fusion/) 替代。
+ * 仍被 cli/sandbox.ts 使用，生产路径已全部切换到 SQLite 融合存储。
+ * 24D 情感向量作为主索引的能力仅在 FusionStorageAdapter 中提供。
+ *
  * 使用 5 个独立的 JSON 文件 + 1 个全局索引文件 + 1 个计数器文件。
  * 适用于 MVP 阶段（~10,000 条记录规模）。
  *
  * 写入策略：全量读取 → 内存修改 → 全量写回
  * 原子性保证：先写临时文件 .tmp，再重命名
- *
- * 待升级：数据量增长后切换为 SQLite 或 LevelDB，此实现被 StorageAdapter 接口完全抽象
  */
 export class JsonStorageAdapter implements StorageAdapter {
   private initialized = false;

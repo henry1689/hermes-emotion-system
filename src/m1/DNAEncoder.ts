@@ -9,7 +9,6 @@ import { L3EntityAnnotator } from './L3EntityAnnotator.js';
 import { SemanticBoundaryDetector } from './SemanticBoundaryDetector.js';
 import type {
   DNA,
-  DNAEncoderError,
   TaxonomyTree,
   SelfModelV1,
 } from './types/dna.js';
