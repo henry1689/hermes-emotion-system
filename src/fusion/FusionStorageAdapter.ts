@@ -1,0 +1,216 @@
+/**
+ * FusionStorageAdapter — 统一存储适配器
+ *
+ * 双写策略：SQLite（主存储，检索/排序/计算） + JSON Zone（人类可读备份）
+ * 读取时优先走 SQLite。
+ *
+ * 取代旧的 JsonStorageAdapter。
+ */
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { DNA } from '../m1/types/dna.js';
+import type { Perception24D } from '../m3/types/perception.js';
+import type { EntityGene } from '../m1/types/dna.js';
+import type { WriteResult, ReadResult, QueryOptions, StorageStatus } from '../m2/types/index.js';
+import { SQLiteAdapter } from './SQLiteAdapter.js';
+import { computeCalcium, initialStrength, updateDynamics } from './math.js';
+import type { EmotionalMemoryRecord, RetrievalQuery, ScoredMemory, EmotionalLandscape } from './types/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = join(__dirname, '..', '..');
+
+export class FusionStorageAdapter {
+  private sqlite: SQLiteAdapter;
+  private dataDir: string;
+  private seqCounter = 0;
+  private initialized = false;
+
+  constructor(dataDir?: string) {
+    this.dataDir = dataDir ?? join(PROJECT_ROOT, 'data', 'webui');
+    this.sqlite = new SQLiteAdapter(join(this.dataDir, 'fusion_memory.db'));
+  }
+
+  async initialize(): Promise<void> {
+    if (!existsSync(this.dataDir)) mkdirSync(this.dataDir, { recursive: true });
+    await this.sqlite.initialize();
+    this.seqCounter = this.sqlite.getTotalCount();
+    this.initialized = true;
+  }
+
+  // ─── 写入（接收 DNA + 24D 感知向量） ───
+
+  async write(dna: DNA, perception: Perception24D): Promise<WriteResult> {
+    this.ensureReady();
+    this.seqCounter++;
+
+    const calcium = computeCalcium(perception);
+    const now = new Date().toISOString();
+    const strength = initialStrength(calcium.score);
+
+    const record: EmotionalMemoryRecord = {
+      id: dna.branch_id,
+      seq_pos: this.seqCounter,
+      created_at: now,
+      perception,
+      calcium_score: calcium.score,
+      calcium_level: calcium.level,
+      raw_input: dna.raw_input,
+      locus_path: dna.locus_path,
+      entity_genes: dna.entity_genes,
+      leaf_zone: dna.leaf_zone,
+      recall_count: 0,
+      last_recalled_at: null,
+      reinforcement_accumulator: 0,
+      effective_strength: strength,
+      strength_updated_at: now,
+      is_landmark: false,
+      landmarked_at: null,
+    };
+
+    // SQLite 写入（主存储）
+    this.sqlite.write(record);
+
+    // JSON Zone 写入（备份）
+    this.appendToJsonZone(dna, perception);
+
+    return {
+      success: true,
+      real_ref: `seq_${String(this.seqCounter).padStart(6, '0')}`,
+      seq_pos: this.seqCounter,
+    };
+  }
+
+  // ─── 读取兼容接口 ───
+
+  async read(branchId: string): Promise<ReadResult> {
+    this.ensureReady();
+    const record = this.sqlite.findById(branchId);
+    if (!record) return { dna: null };
+    return { dna: this.toDNA(record) };
+  }
+
+  async findByLocus(locusPath: string, options?: QueryOptions): Promise<DNA[]> {
+    this.ensureReady();
+    const records = this.sqlite.findByLocus(locusPath, options?.limit ?? 20);
+    return records.map(r => this.toDNA(r));
+  }
+
+  async findBySeqPosRange(start: number, end: number, options?: QueryOptions): Promise<DNA[]> {
+    this.ensureReady();
+    const records = this.sqlite.findBySeqPosRange(start, end, options?.limit ?? 50);
+    return records.map(r => this.toDNA(r));
+  }
+
+  // ─── 新增：情感检索 ───
+
+  findByEmotionalSimilarity(query: RetrievalQuery): ScoredMemory[] {
+    this.ensureReady();
+    return this.sqlite.findByEmotionalSimilarity(query);
+  }
+
+  updateRecall(memoryIds: string[]): void {
+    this.ensureReady();
+    this.sqlite.updateRecall(memoryIds);
+  }
+
+  applyReinforcement(perception: Perception24D, calcium: number, memoryIds: string[]): void {
+    this.ensureReady();
+    this.sqlite.applyReinforcement(perception, calcium, memoryIds);
+  }
+
+  getEmotionalLandscape(): EmotionalLandscape {
+    this.ensureReady();
+    return this.sqlite.getEmotionalLandscape();
+  }
+
+  promoteToLandmark(memoryId: string, narrativeTag?: string, sensoryAnchor?: string): boolean {
+    this.ensureReady();
+    return this.sqlite.promoteToLandmark(memoryId, narrativeTag, sensoryAnchor);
+  }
+
+  runDecayMaintenance(): { total: number; archived: number } {
+    this.ensureReady();
+    return this.sqlite.runDecayMaintenance();
+  }
+
+  // ─── 状态 ───
+
+  async getStatus(): Promise<StorageStatus> {
+    this.ensureReady();
+    const status = this.sqlite.getStatus();
+    return {
+      totalRecords: status.totalRecords,
+      zoneCounts: {},
+      currentSeqPos: this.seqCounter,
+      storagePath: this.dataDir,
+    };
+  }
+
+  async nextSeqPos(): Promise<number> {
+    this.seqCounter++;
+    return this.seqCounter;
+  }
+
+  // ─── SQLite 直通 ───
+
+  getSQLite(): SQLiteAdapter {
+    return this.sqlite;
+  }
+
+  // ─── 私有方法 ───
+
+  private ensureReady(): void {
+    if (!this.initialized) throw new Error('FusionStorageAdapter not initialized');
+  }
+
+  private toDNA(record: EmotionalMemoryRecord): DNA {
+    return {
+      branch_id: record.id,
+      seq_pos: 0,
+      locus_path: record.locus_path,
+      taxonomy_version: '1.0',
+      leaf_zone: record.leaf_zone as any,
+      ref: `seq_${String(record.seq_pos).padStart(6, '0')}`,
+      entity_genes: record.entity_genes,
+      raw_input: record.raw_input,
+      created_at: record.created_at,
+    };
+  }
+
+  /**
+   * Zone JSON 备份写入
+   * 保持与旧 JsonStorageAdapter 兼容的格式
+   */
+  private appendToJsonZone(dna: DNA, perception: Perception24D): void {
+    try {
+      const zone = dna.leaf_zone || 'language_semantic_zone';
+      const zoneDir = join(this.dataDir, 'zones');
+      if (!existsSync(zoneDir)) mkdirSync(zoneDir, { recursive: true });
+
+      const filePath = join(zoneDir, `${zone}.json`);
+      let data: any[] = [];
+      if (existsSync(filePath)) {
+        try { data = JSON.parse(readFileSync(filePath, 'utf-8')); } catch { data = []; }
+      }
+
+      data.push({
+        position: data.length,
+        seq_pos: this.seqCounter,
+        dna: { ...dna, leaf_zone: undefined },
+        written_at: new Date().toISOString(),
+        perception_preview: {
+          calcium_score: computeCalcium(perception).score,
+          pleasure: perception.pleasure,
+          arousal: perception.arousal,
+          intimacy: perception.intimacy,
+        },
+      });
+
+      writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('[FusionStorageAdapter] Zone backup write failed:', err);
+    }
+  }
+}

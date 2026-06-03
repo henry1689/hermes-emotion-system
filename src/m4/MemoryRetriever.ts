@@ -15,6 +15,10 @@ export class MemoryRetriever {
 
   /**
    * 根据 M3 决策检索相关历史记忆
+   *
+   * 检索策略（按优先级）：
+   * 1. 按 locus_path 话题前缀检索 — 分类树路由匹配
+   * 2. 按实体名称 + 原始输入关键词全文搜索 — 真正的内容匹配
    */
   async retrieveMemories(
     locusPath: string,
@@ -23,29 +27,58 @@ export class MemoryRetriever {
   ): Promise<DNA[]> {
     const limit = options?.limit ?? 5;
 
-    // 1. 按话题前缀检索
+    // 1. 按话题前缀检索（基于分类树路由）
     const byLocus = await this.storage.findByLocus(locusPath, { limit: 20 });
 
-    // 2. 按实体名称检索
-    const entityResults = new Map<string, DNA>();
-    for (const entity of entities) {
-      if (entity.type !== 'person' && entity.type !== 'place') continue;
-      const all = await this.storage.findByLocus(entity.name, { limit: 10 });
-      for (const dna of all) {
-        if (dna.raw_input.includes(entity.name)) {
-          entityResults.set(dna.branch_id, dna);
+    // ─── 2. 关键词全文搜索（替代已废弃的 findByLocus(entity.name)） ───
+    //
+    // 之前版本使用 this.storage.findByLocus(entity.name) 来"按实体搜索"，
+    // 但 findByLocus 内部用 locus_path.startsWith(name) 过滤索引，
+    // 而所有 locus_path 都是 "user.xxx.yyy" 格式，实体名 "我"、"画" 等永远不匹配。
+    // → 实体搜索自项目诞生以来从未真正生效过。
+    //
+    // 修正：从最近记录中按 raw_input 包含关键词来筛选。
+    const byKeyword: DNA[] = [];
+    const keywords = new Set<string>();
+
+    // 实体名称作为搜索词
+    for (const e of entities) {
+      if (e.name && e.name.length > 0) keywords.add(e.name);
+    }
+
+    // 从当前 locus_path 推断关键词（取最后一段）
+    if (locusPath) {
+      const segments = locusPath.split('.');
+      const last = segments[segments.length - 1];
+      if (last && last !== 'default' && last !== 'general') keywords.add(last);
+    }
+
+    if (keywords.size > 0) {
+      try {
+        // 检索最近 60 条记录（含各分区）
+        const recent = await this.storage.findBySeqPosRange(0, 999_999_999, {
+          limit: 60,
+          ascending: false,
+        });
+        const seen = new Set<string>();
+        for (const dna of recent) {
+          for (const kw of keywords) {
+            if (dna.raw_input.includes(kw) && !seen.has(dna.branch_id)) {
+              seen.add(dna.branch_id);
+              byKeyword.push(dna);
+              break;
+            }
+          }
         }
+      } catch {
+        // 静默失败
       }
     }
-    // 按时间降序排列
-    const byEntity = [...entityResults.values()]
-      .sort((a, b) => b.seq_pos - a.seq_pos)
-      .slice(0, limit);
 
-    // 3. 合并去重
+    // 3. 合并去重（byKeyword 优先于 byLocus，因为全文匹配更精准）
     const seen = new Set<string>();
     const merged: DNA[] = [];
-    for (const dna of [...byEntity, ...byLocus]) {
+    for (const dna of [...byKeyword, ...byLocus]) {
       if (!seen.has(dna.branch_id) && merged.length < limit) {
         seen.add(dna.branch_id);
         merged.push(dna);

@@ -144,7 +144,7 @@ function buildLongResponse(intensity: number, isHigh: boolean): string {
 // ════════════════════════════════════════════════════════
 
 export class MockLLMProvider implements LLMProvider {
-  async generate(params: { strategy: StrategyConfig; cognition: CognitionObject }): Promise<{ text: string }> {
+  async generate(params: { strategy: StrategyConfig; cognition: CognitionObject; conversationHistory?: Array<{role: 'user'|'assistant'; content: string}> }): Promise<{ text: string }> {
     const s = params.cognition.current.perception_snapshot;
     const ents = params.cognition.current.key_entities.join('');
     const tone = params.strategy.params.tone;

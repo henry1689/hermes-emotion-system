@@ -2,7 +2,7 @@
 // Ref: M5-design-v1.md §6
 
 import type { M4Context } from '../m4/types/index.js';
-import type { LLMProvider, CognitionObject, StrategyConfig } from './types/index.js';
+import type { LLMProvider, CognitionObject, StrategyConfig, ConversationTurn } from './types/index.js';
 import { CognitionAssembler } from './CognitionAssembler.js';
 import { StrategySelector } from './StrategySelector.js';
 import { MockLLMProvider } from './MockLLMProvider.js';
@@ -23,8 +23,9 @@ export class M5Orchestrator {
 
   /**
    * 执行完整的四步表达生成流水线
+   * @param conversationHistory 最近对话轮次（用于 LLM 上下文记忆）
    */
-  async orchestrate(m4ctx: M4Context): Promise<string> {
+  async orchestrate(m4ctx: M4Context, conversationHistory?: ConversationTurn[]): Promise<string> {
     // Step 1: 认知组装（纯函数）
     const cognition = this.assembler.assemble(m4ctx);
 
@@ -34,7 +35,7 @@ export class M5Orchestrator {
     // Step 3: LLM 受控生成（唯一LLM调用点）
     let draft: string;
     try {
-      const result = await this.llm.generate({ strategy, cognition });
+      const result = await this.llm.generate({ strategy, cognition, conversationHistory });
       draft = result.text;
     } catch {
       draft = '';

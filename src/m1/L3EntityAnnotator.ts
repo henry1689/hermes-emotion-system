@@ -101,6 +101,15 @@ const ENTITY_EXTRACTION_RULES: NormalizedEntityRule[] = [
   { name: '宠物', type: 'object', patterns: ['猫', '狗', '宠物'] },
   { name: '花', type: 'object', patterns: ['花'] },
   { name: '书', type: 'object', patterns: ['书'] },
+
+  // ── Hobby / Creativity ──
+  { name: '画画', type: 'object', patterns: ['画画', '画国画', '画山水', '画人物', '绘画', '作画'] },
+  { name: '国画', type: 'object', patterns: ['国画', '水墨画', '工笔', '写意'] },
+  { name: '摄影', type: 'object', patterns: ['摄影', '拍照', '相机'] },
+  { name: '音乐', type: 'object', patterns: ['音乐', '弹琴', '吉他', '钢琴', '唱歌'] },
+  { name: '运动', type: 'object', patterns: ['运动', '跑步', '健身', '游泳', '打球', '篮球', '足球'] },
+  { name: '游戏', type: 'object', patterns: ['游戏', '打游戏', '玩'] },
+  { name: '烹饪', type: 'object', patterns: ['烹饪', '做饭', '做菜', '厨艺', '烘焙'] },
 ];
 
 /**

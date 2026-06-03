@@ -55,9 +55,15 @@ export interface StrategyConfig {
   description: string;
 }
 
+export interface ConversationTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface LLMProvider {
   generate(params: {
     strategy: StrategyConfig;
     cognition: CognitionObject;
+    conversationHistory?: ConversationTurn[];
   }): Promise<{ text: string; usage?: { prompt: number; completion: number } }>;
 }

@@ -23,8 +23,11 @@ export class CognitionAssembler {
     let historySummary = '无相关历史记忆';
     let timeSpan = '';
     if (hasHistory) {
-      const latest = m4ctx.memory_summary.timeline[0];
-      historySummary = '提及相关话题: "' + latest.summary + '"';
+      // 展开最近 5 条相关记忆摘要，让 LLM 有更完整的上下文
+      const recentItems = m4ctx.memory_summary.timeline.slice(0, 5);
+      historySummary = recentItems
+        .map((item) => item.summary.replace(/\.\.\.$/, ''))
+        .join(' → ');
       timeSpan = m4ctx.memory_summary.timeSpan.earliest + ' ~ ' + m4ctx.memory_summary.timeSpan.latest;
     }
     if (p.energy_merge > 0.3) emotionSummary += '，带有心灵交融感';

@@ -1,0 +1,557 @@
+/**
+ * SQLiteAdapter — SQLite 记忆存储封装
+ *
+ * 作为融合记忆系统的主存储引擎。
+ * 使用 sql.js（纯 JS SQLite 实现，零原生依赖）。
+ *
+ * 遵循 `src/m4/FamilyGraph.ts` 中已建立的 sql.js 使用模式。
+ */
+// @ts-ignore - sql.js ships its own types
+import initSqlJs from 'sql.js';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Perception24D } from '../m3/types/perception.js';
+import type { EntityGene } from '../m1/types/dna.js';
+import type {
+  EmotionalMemoryRecord,
+  RetrievalQuery,
+  ScoredMemory,
+  EmotionalLandscape,
+  InductionSummary,
+  SimilarityMode,
+} from './types/index.js';
+import {
+  computeCalcium,
+  emotionalSimilarity,
+  allocateRetrievalWeights,
+  updateDynamics,
+  recallBoost,
+  reinforcementBoost,
+  initialStrength,
+} from './math.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = join(__dirname, '..', '..');
+const DEFAULT_DB_PATH = join(PROJECT_ROOT, 'data', 'webui', 'fusion_memory.db');
+const SCHEMA_PATH = join(__dirname, 'schema.sql');
+
+interface SqlJsDatabase {
+  run(sql: string, params?: any[]): void;
+  exec(sql: string): Array<{
+    columns: string[];
+    values: any[][];
+  }>;
+  prepare(sql: string): SqlJsStatement;
+  close(): void;
+  export(): Uint8Array;
+}
+
+interface SqlJsStatement {
+  bind(params?: any[]): void;
+  step(): boolean;
+  getAsObject(): any;
+  free(): void;
+}
+
+/** 将 EntityGene[] 转为 JSON 字符串 */
+function genesToJson(genes: EntityGene[]): string {
+  return JSON.stringify(genes.map(g => ({
+    name: g.name, type: g.type, allele: g.allele,
+    phenotype: g.phenotype, knowledge_type: g.knowledge_type,
+  })));
+}
+
+/** 从 JSON 字符串恢复 EntityGene[] */
+function jsonToGenes(json: string): EntityGene[] {
+  try { return JSON.parse(json); } catch { return []; }
+}
+
+export class SQLiteAdapter {
+  private db: SqlJsDatabase | null = null;
+  private dbPath: string;
+  private ready = false;
+
+  constructor(dbPath?: string) {
+    this.dbPath = dbPath ?? DEFAULT_DB_PATH;
+  }
+
+  async initialize(): Promise<void> {
+    // @ts-ignore
+    const SQL = await initSqlJs();
+    const dir = dirname(this.dbPath);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+    if (existsSync(this.dbPath)) {
+      const buffer = readFileSync(this.dbPath);
+      this.db = new SQL.Database(buffer) as unknown as SqlJsDatabase;
+    } else {
+      this.db = new SQL.Database() as unknown as SqlJsDatabase;
+    }
+
+    // 执行 DDL
+    const ddl = readFileSync(SCHEMA_PATH, 'utf-8');
+    this.db.run(ddl);
+    this.ready = true;
+    console.log(`[SQLiteAdapter] 初始化完成: ${this.dbPath}`);
+  }
+
+  close(): void {
+    if (this.db) this.db.close();
+    this.ready = false;
+  }
+
+  // ─── 写入 ───
+
+  write(record: EmotionalMemoryRecord): void {
+    this.ensureReady();
+    const pJson = JSON.stringify([
+      record.perception.pleasure, record.perception.arousal,
+      record.perception.dominance, record.perception.aggression,
+      record.perception.sincerity, record.perception.humor,
+      record.perception.factual, record.perception.logical,
+      record.perception.certainty, record.perception.abstract,
+      record.perception.temporal_focus, record.perception.self_ref,
+      record.perception.intimacy, record.perception.power_diff,
+      record.perception.dependency, record.perception.moral_judgment,
+      record.perception.etiquette, record.perception.belonging,
+      record.perception.sexual_attraction, record.perception.sensory_craving,
+      record.perception.energy_merge, record.perception.possessiveness,
+      record.perception.ecstasy, record.perception.safety,
+    ]);
+
+    this.runSql(
+      `INSERT OR REPLACE INTO memories
+      (id, seq_pos, created_at, perception_json,
+       calcium_score, calcium_level,
+       locus_path, leaf_zone, raw_input,
+       recall_count, last_recalled_at,
+       reinforcement_accumulator, effective_strength, strength_updated_at,
+       is_landmark, landmarked_at, narrative_tag, sensory_anchor,
+       scar_type, scar_healed)
+      VALUES (?, ?, ?, ?,
+              ?, ?,
+              ?, ?, ?,
+              ?, ?,
+              ?, ?, ?,
+              ?, ?, ?, ?,
+              ?, ?)`,
+      [
+        record.id, record.seq_pos, record.created_at, pJson,
+        record.calcium_score, record.calcium_level,
+        record.locus_path, record.leaf_zone, record.raw_input,
+        record.recall_count, record.last_recalled_at,
+        record.reinforcement_accumulator, record.effective_strength, record.strength_updated_at,
+        record.is_landmark ? 1 : 0, record.landmarked_at,
+        record.narrative_tag ?? null, record.sensory_anchor ?? null,
+        record.scar?.type ?? null, record.scar?.healed ? 1 : record.scar ? 0 : null,
+      ],
+    );
+
+    // 写入实体关联
+    for (const gene of record.entity_genes) {
+      this.ensureEntity(gene.name, gene.type);
+      this.runSql(
+        `INSERT OR IGNORE INTO memory_entities (memory_id, entity_id, allele, phenotype, knowledge_type)
+        VALUES (?, (SELECT id FROM entities WHERE name=? AND type=?), ?, ?, ?)`,
+        [record.id, gene.name, gene.type, gene.allele, gene.phenotype, gene.knowledge_type],
+      );
+    }
+
+    // 持久化到磁盘
+    this.save();
+  }
+
+  private ensureEntity(name: string, type: string): void {
+    this.runSql(
+      `INSERT OR IGNORE INTO entities (name, type) VALUES (?, ?)`,
+      [name, type],
+    );
+  }
+
+  // ─── 读取 ───
+
+  /** 按 seq_pos 范围读取 */
+  findBySeqPosRange(start: number, end: number, limit = 50): EmotionalMemoryRecord[] {
+    this.ensureReady();
+    const res = this.execSql(
+      `SELECT * FROM memories WHERE seq_pos >= ? AND seq_pos <= ?
+       ORDER BY seq_pos DESC LIMIT ?`,
+      [start, end, limit],
+    );
+    return this.rowsToRecords(res);
+  }
+
+  /** 按 locus_path 前缀匹配 */
+  findByLocus(locusPath: string, limit = 20): EmotionalMemoryRecord[] {
+    this.ensureReady();
+    const res = this.execSql(
+      `SELECT * FROM memories WHERE locus_path LIKE ?
+       ORDER BY seq_pos DESC LIMIT ?`,
+      [`${locusPath}%`, limit],
+    );
+    return this.rowsToRecords(res);
+  }
+
+  /** 按 branch_id 精确查询 */
+  findById(id: string): EmotionalMemoryRecord | null {
+    this.ensureReady();
+    const res = this.execSql(
+      `SELECT * FROM memories WHERE id = ? LIMIT 1`,
+      [id],
+    );
+    const records = this.rowsToRecords(res);
+    return records.length > 0 ? records[0] : null;
+  }
+
+  /** 获取总记录数 */
+  getTotalCount(): number {
+    this.ensureReady();
+    const res = this.execSql(`SELECT COUNT(*) as cnt FROM memories`);
+    if (res.length > 0 && res[0].values.length > 0) {
+      return res[0].values[0][0] as number;
+    }
+    return 0;
+  }
+
+  // ─── 情感检索（核心新能力） ───
+
+  /**
+   * 按情感相似度检索。
+   * 遍历全部记录，计算加权余弦相似度，返回 Top-N。
+   * 后续可优化为 KD-tree 索引。
+   */
+  findByEmotionalSimilarity(query: RetrievalQuery): ScoredMemory[] {
+    this.ensureReady();
+    const all = this.execSql(
+      `SELECT * FROM memories ORDER BY seq_pos DESC LIMIT 200`,
+    );
+    const records = this.rowsToRecords(all);
+    const weights = allocateRetrievalWeights(
+      query.entities?.length ?? 0,
+      query.current_perception.arousal,
+      query.similarity_mode,
+    );
+
+    const scored: ScoredMemory[] = [];
+    for (const record of records) {
+      // 衰减门控
+      if (record.effective_strength < 0.05) continue;
+
+      const emotional = emotionalSimilarity(
+        query.current_perception,
+        record.perception,
+        query.similarity_mode,
+      );
+
+      const topic = query.locus_path
+        ? (record.locus_path.startsWith(query.locus_path) ? 1.0 : 0.0)
+        : 0;
+
+      let entityOverlap = 0;
+      if (query.entities && query.entities.length > 0) {
+        const recordNames = new Set(record.entity_genes.map(g => g.name));
+        const matched = query.entities.filter(e => recordNames.has(e)).length;
+        const union = new Set([...query.entities, ...recordNames]).size;
+        entityOverlap = union > 0 ? matched / union : 0;
+      }
+
+      const calcium = record.calcium_score;
+
+      const str = record.effective_strength ?? 0.5;
+      const composite = isNaN(str) ? 0.5 : str * (
+        weights.emotional * emotional +
+        weights.topic * topic +
+        weights.entity * entityOverlap +
+        weights.calcium * calcium
+      );
+
+      // Guard against NaN from any missing fields
+      const safeComposite = isNaN(composite) ? 0 : Math.max(0, Math.min(1, composite));
+
+      if (safeComposite > 0.05) {
+        scored.push({
+          record,
+          scores: { emotional, topic, entity: entityOverlap, calcium },
+          composite: safeComposite,
+        });
+      }
+    }
+
+    return scored.sort((a, b) => b.composite - a.composite).slice(0, query.limit);
+  }
+
+  // ─── 记忆动力学更新 ───
+
+  /** 更新召回避次数 + 重新巩固增强 */
+  updateRecall(memoryIds: string[]): void {
+    this.ensureReady();
+    const now = new Date().toISOString();
+    for (const id of memoryIds) {
+      const record = this.findById(id);
+      if (!record) continue;
+
+      record.recall_count++;
+      record.last_recalled_at = now;
+      const boost = recallBoost(record.effective_strength);
+      record.effective_strength = Math.min(1.0, record.effective_strength + boost);
+      record.strength_updated_at = now;
+
+      this.write(record);
+    }
+  }
+
+  /** 批量衰减维护 */
+  runDecayMaintenance(): { total: number; archived: number } {
+    this.ensureReady();
+    const all = this.execSql(`SELECT * FROM memories`);
+    const records = this.rowsToRecords(all);
+    const now = new Date();
+    let archived = 0;
+
+    for (const record of records) {
+      const before = record.effective_strength;
+      updateDynamics(record, now);
+
+      // 记录衰减日志
+      const lastUpdate = record.strength_updated_at
+        ? Math.max(0, (now.getTime() - new Date(record.strength_updated_at).getTime()) / 86_400_000)
+        : 0;
+      this.runSql(
+        `INSERT INTO decay_log (memory_id, checked_at, strength_before, strength_after, days_elapsed)
+         VALUES (?, ?, ?, ?, ?)`,
+        [record.id, now.toISOString(), before, record.effective_strength, lastUpdate],
+      );
+
+      this.write(record);
+      if (record.effective_strength < 0.05) archived++;
+    }
+
+    return { total: records.length, archived };
+  }
+
+  /** 情感相似事件增强 */
+  applyReinforcement(
+    newPerception: Perception24D,
+    newCalcium: number,
+    memoryIds: string[],
+  ): void {
+    this.ensureReady();
+    const now = new Date().toISOString();
+    for (const id of memoryIds) {
+      const record = this.findById(id);
+      if (!record) continue;
+
+      const similarity = emotionalSimilarity(newPerception, record.perception, 'balanced');
+      if (similarity < 0.3) continue;
+
+      const boost = reinforcementBoost(record.calcium_score, newCalcium, similarity);
+      record.reinforcement_accumulator += boost;
+      record.effective_strength = Math.min(1.0, record.effective_strength + boost * 0.1);
+      record.strength_updated_at = now;
+
+      this.write(record);
+    }
+  }
+
+  // ─── 年轮/地标视图 ───
+
+  /** 获取情感地形图 */
+  getEmotionalLandscape(): EmotionalLandscape {
+    this.ensureReady();
+    const landmarks = this.execSql(
+      `SELECT * FROM memories WHERE is_landmark = 1
+       ORDER BY calcium_score DESC LIMIT 50`,
+    );
+    const records = this.rowsToRecords(landmarks);
+
+    return {
+      peaks: records.map(r => ({
+        id: r.id,
+        created_at: r.created_at,
+        calcium: r.calcium_score,
+        pleasure: r.perception.pleasure,
+        intimacy: r.perception.intimacy,
+        snippet: r.raw_input.substring(0, 60),
+        narrative_tag: r.narrative_tag,
+      })),
+      scars: records
+        .filter(r => r.scar && !r.scar.healed)
+        .map(r => ({
+          id: r.id,
+          created_at: r.created_at,
+          calcium: r.calcium_score,
+          pleasure: r.perception.pleasure,
+          type: r.scar!.type,
+          snippet: r.raw_input.substring(0, 60),
+        })),
+      cluster_count: records.length,
+    };
+  }
+
+  /** 晋升为地标 */
+  promoteToLandmark(memoryId: string, narrativeTag?: string, sensoryAnchor?: string): boolean {
+    this.ensureReady();
+    const record = this.findById(memoryId);
+    if (!record) return false;
+
+    record.is_landmark = true;
+    record.landmarked_at = new Date().toISOString();
+    if (narrativeTag) record.narrative_tag = narrativeTag;
+    if (sensoryAnchor) record.sensory_anchor = sensoryAnchor;
+
+    this.write(record);
+    return true;
+  }
+
+  // ─── 状态 ───
+
+  getStatus(): { totalRecords: number; landmarks: number; totalEntities: number } {
+    this.ensureReady();
+    const cnt = this.execSql(`SELECT
+      (SELECT COUNT(*) FROM memories) as totalRecords,
+      (SELECT COUNT(*) FROM memories WHERE is_landmark=1) as landmarks,
+      (SELECT COUNT(*) FROM entities) as totalEntities`);
+    const row = cnt[0]?.values[0];
+    return {
+      totalRecords: row?.[0] ?? 0,
+      landmarks: row?.[1] ?? 0,
+      totalEntities: row?.[2] ?? 0,
+    };
+  }
+
+  /** 直接执行 SQL（供 InductionScheduler 等内部使用） */
+  writeRaw(sql: string, ...params: any[]): void {
+    this.ensureReady();
+    this.runSql(sql, params.length > 0 ? params : undefined);
+    this.save();
+  }
+
+  // ─── 私有方法 ───
+
+  private ensureReady(): void {
+    if (!this.ready || !this.db) throw new Error('SQLiteAdapter not initialized');
+  }
+
+  /** 将内存数据库持久化到磁盘 */
+  private save(): void {
+    if (!this.db) return;
+    try {
+      const data = (this.db as any).export();
+      const buffer = Buffer.from(data);
+      writeFileSync(this.dbPath, buffer);
+    } catch (err) {
+      console.error('[SQLiteAdapter] save failed:', err);
+    }
+  }
+
+  /** sql.js 的 run 方法运行时接受 params，但类型定义可能不完整 */
+  private runSql(sql: string, params?: any[]): void {
+    (this.db as any).run(sql, params);
+  }
+
+  /** 带参数的 exec 查询 */
+  private execSql(sql: string, params?: any[]): Array<{ columns: string[]; values: any[][] }> {
+    if (params) {
+      const stmt = (this.db as any).prepare(sql);
+      stmt.bind(params);
+      const results: any[] = [];
+      while (stmt.step()) {
+        results.push(stmt.getAsObject());
+      }
+      stmt.free();
+      // 包装为 exec 返回格式
+      if (results.length === 0) return [];
+      const columns = Object.keys(results[0]);
+      const values = results.map(r => columns.map(c => r[c]));
+      return [{ columns, values }];
+    }
+    return (this.db as any).exec(sql);
+  }
+
+  private rowToRecord(row: any[] | Record<string, any>, columns?: string[]): EmotionalMemoryRecord {
+    // 支持 exec() 返回的两种格式
+    let obj: Record<string, any>;
+    if (Array.isArray(row) && columns) {
+      obj = {};
+      for (let i = 0; i < columns.length; i++) obj[columns[i]] = row[i];
+    } else {
+      obj = row as Record<string, any>;
+    }
+
+    const pArr: number[] = typeof obj.perception_json === 'string'
+      ? JSON.parse(obj.perception_json)
+      : obj.perception_json ?? Array(24).fill(0.5);
+
+    const perception: Perception24D = {
+      pleasure: pArr[0], arousal: pArr[1], dominance: pArr[2],
+      aggression: pArr[3], sincerity: pArr[4], humor: pArr[5],
+      factual: pArr[6], logical: pArr[7], certainty: pArr[8],
+      abstract: pArr[9], temporal_focus: pArr[10], self_ref: pArr[11],
+      intimacy: pArr[12], power_diff: pArr[13], dependency: pArr[14],
+      moral_judgment: pArr[15], etiquette: pArr[16], belonging: pArr[17],
+      sexual_attraction: pArr[18], sensory_craving: pArr[19],
+      energy_merge: pArr[20], possessiveness: pArr[21],
+      ecstasy: pArr[22], safety: pArr[23],
+    };
+
+    // 读取实体关联
+    let entityGenes: EntityGene[] = [];
+    try {
+      const entRes = this.execSql(
+        `SELECT e.name, e.type, me.allele, me.phenotype, me.knowledge_type
+         FROM memory_entities me JOIN entities e ON me.entity_id = e.id
+         WHERE me.memory_id = ?`,
+        [obj.id],
+      );
+      if (entRes.length > 0) {
+        for (const rowVals of entRes[0].values) {
+          const cols = entRes[0].columns;
+          const rowObj: Record<string, any> = {};
+          for (let i = 0; i < cols.length; i++) rowObj[cols[i]] = rowVals[i];
+          entityGenes.push({
+            name: rowObj.name as string,
+            type: rowObj.type as any,
+            allele: rowObj.allele as string,
+            phenotype: rowObj.phenotype as any,
+            knowledge_type: rowObj.knowledge_type as any,
+          });
+        }
+      }
+    } catch { /* 静默 */ }
+
+    return {
+      id: obj.id,
+      seq_pos: obj.seq_pos,
+      created_at: obj.created_at,
+      perception,
+      calcium_score: obj.calcium_score,
+      calcium_level: obj.calcium_level as 0 | 1 | 2 | 3,
+      raw_input: obj.raw_input,
+      locus_path: obj.locus_path,
+      entity_genes: entityGenes,
+      leaf_zone: obj.leaf_zone,
+      recall_count: obj.recall_count ?? 0,
+      last_recalled_at: obj.last_recalled_at ?? null,
+      reinforcement_accumulator: obj.reinforcement_accumulator ?? 0,
+      effective_strength: obj.effective_strength ?? 1.0,
+      strength_updated_at: obj.strength_updated_at ?? obj.created_at,
+      is_landmark: obj.is_landmark === 1 || obj.is_landmark === true,
+      landmarked_at: obj.landmarked_at ?? null,
+      narrative_tag: obj.narrative_tag ?? undefined,
+      sensory_anchor: obj.sensory_anchor ?? undefined,
+      scar: obj.scar_type ? {
+        type: obj.scar_type,
+        healed: obj.scar_healed === 1,
+        healed_at: null,
+      } : undefined,
+    };
+  }
+
+  private rowsToRecords(results: Array<{ columns: string[]; values: any[][] }>): EmotionalMemoryRecord[] {
+    if (results.length === 0) return [];
+    const { columns, values } = results[0];
+    return values.map((row: any[]) => this.rowToRecord(row, columns));
+  }
+}

@@ -6,6 +6,7 @@
       "family": ["general", "conflict", "care"],
       "emotion": ["positive", "negative", "neutral"],
       "work": ["general", "stress", "achievement"],
+      "daily": ["general", "creation", "entertainment", "health"],
       "misc": ["default"]
     }
   }
