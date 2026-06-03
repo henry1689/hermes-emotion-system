@@ -1,10 +1,10 @@
 /**
- * ConsolidationQueue — 空闲记忆回放队列
+ * M7-Consolidation · ConsolidationQueue — 记忆巩固队列
  *
  * 当系统空闲时（无用户消息 >30s），从近期记忆中挑选高钙化候选，
  * 验证其钙化是否维持高水平，晋升符合条件的到 M8 地标。
  *
- * 这是 M7 空闲巩固管道的一部分，与 DreamQueue 并行运行。
+ * @module M7-Consolidation
  */
 import type { FusionStorageAdapter } from '../fusion/FusionStorageAdapter.js';
 

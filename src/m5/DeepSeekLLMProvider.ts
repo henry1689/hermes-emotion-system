@@ -12,7 +12,12 @@ import type { LLMProvider, StrategyConfig, CognitionObject, ConversationTurn } f
 import { buildSystemPrompt, STYLE_ANCHORS } from './persona/lover-persona.js';
 import { calcLevel } from './expression/TierVocabMap.js';
 
-const API_KEY = process.env['DEEPSEEK_API_KEY'] ?? 'sk-9634759e29624d18aa503a17265a3240';
+const API_KEY = process.env['DEEPSEEK_API_KEY'];
+
+if (!API_KEY) {
+  console.warn('[DeepSeekLLMProvider] 警告: 未设置 DEEPSEEK_API_KEY 环境变量，将使用降级回复');
+}
+
 const MODEL = process.env['DEEPSEEK_MODEL'] ?? 'deepseek-chat';
 const BASE_URL = 'https://api.deepseek.com/v1';
 const MAX_HISTORY_TURNS = 20; // 保留最近 10 轮完整对话
@@ -31,7 +36,7 @@ interface DeepSeekResponse {
 }
 
 export function isAvailable(): boolean {
-  return !!API_KEY;
+  return !!API_KEY && API_KEY !== 'sk-9634759e29624d18aa503a17265a3240';
 }
 
 export class DeepSeekLLMProvider implements LLMProvider {

@@ -22,11 +22,12 @@ import { InductionScheduler } from '../m7/InductionScheduler.js';
 import { ConsolidationQueue } from '../m7/ConsolidationQueue.js';
 import { M7Orchestrator, startM7Interval } from '../m7/M7Orchestrator.js';
 import { M8FusionAdapter } from '../m8/M8FusionAdapter.js';
-import { computeCalcium, emotionalSimilarity } from '../fusion/math.js';
+import { computeCalcium } from '../fusion/math.js';
 import { rerank } from '../m4/Reranker.js';
 import { decompose, mergeDecomposedResults } from '../m4/QueryDecomposer.js';
 import { WorkingMemory } from '../m9/WorkingMemory.js';
-import type { SimilarityMode, EmotionalMemoryRecord, ScoredMemory } from '../fusion/types/index.js';
+import { M6Orchestrator } from '../m6/M6Orchestrator.js';
+import type { SimilarityMode, ScoredMemory } from '../fusion/types/index.js';
 import type { SelfModelV1 } from '../m1/types/dna.js';
 import type { ConversationTurn } from '../m5/types/index.js';
 import type { M3Decision } from '../m3/types/perception.js';
@@ -41,13 +42,33 @@ const HTML_PATH = path.join(__dirname, 'index.html');
 const CONV_LOG_PATH = path.join(DATA_DIR, 'conversations.json');
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-const SELF: SelfModelV1 = {
-  identity: { name: 'Hermes', persona: '温柔深情的陪伴者', birth_date: '2026-06-02T00:00:00.000Z' },
-  traits: { openness: 0.7, conscientiousness: 0.6, extraversion: 0.4, agreeableness: 0.8, neuroticism: 0.3 },
-  boundaries: ['不提供医疗建议', '不泄露隐私', '不编造事实'],
-  preferences: { likes: ['深度对话'], dislikes: ['敷衍'] },
-  narrative_identity: '我是玉瑶，与你共处太虚境',
-};
+// M6 自我模型（延迟初始化，在 initPipeline 中赋值）
+let m6: M6Orchestrator;
+
+/** 从 M6 自我模型动态构建 SelfModelV1 */
+function getSelfModel(): SelfModelV1 {
+  if (!m6) {
+    return {
+      identity: { name: '玉瑶', persona: '温柔深情的陪伴者', birth_date: '2026-06-02T00:00:00.000Z' },
+      traits: { openness: 0.7, conscientiousness: 0.6, extraversion: 0.4, agreeableness: 0.8, neuroticism: 0.3 },
+      boundaries: [], preferences: { likes: [], dislikes: [] },
+      narrative_identity: '我是玉瑶',
+    };
+  }
+  const model = m6.manager.getModel();
+  return {
+    identity: { name: '玉瑶', persona: '温柔深情的陪伴者', birth_date: '2026-06-02T00:00:00.000Z' },
+    traits: { ...model.traits },
+    boundaries: model.boundaries.map(b => b.rule),
+    preferences: {
+      likes: model.preferences.filter(p => p.type === 'like').map(p => p.name),
+      dislikes: model.preferences.filter(p => p.type === 'dislike').map(p => p.name),
+    },
+    narrative_identity: model.narrative_layers.length > 0
+      ? model.narrative_layers[model.narrative_layers.length - 1].text
+      : '我是玉瑶',
+  };
+}
 
 // ── 对话记忆 ──
 let conversationHistory: ConversationTurn[] = [];
@@ -100,11 +121,12 @@ let m5: M5Orchestrator;
 let inductionScheduler: InductionScheduler;
 let consolidationQueue: ConsolidationQueue;
 let m7: M7Orchestrator;
-let m7Timer: ReturnType<typeof setInterval> | null;
+let m7Timer: ReturnType<typeof setInterval> | null = null;
+let m6Timer: ReturnType<typeof setInterval> | null = null;
 let workingMemory: WorkingMemory;
 async function initPipeline(): Promise<void> {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  encoder = new DNAEncoder(SELF);
+  encoder = new DNAEncoder(getSelfModel());
   storage = new FusionStorageAdapter(DATA_DIR);
   await storage.initialize();
   familyGraph = new FamilyGraph(DB_PATH);
@@ -128,6 +150,12 @@ async function initPipeline(): Promise<void> {
   m7Timer = startM7Interval(m7);
   console.log('  梦境引擎已启动 ✓');
 
+  m6 = new M6Orchestrator();
+  // M6 周期性维护（15分钟一次）
+  if (m6Timer) clearInterval(m6Timer);
+  m6Timer = setInterval(() => { try { m6?.maintenance(); } catch {} }, 15 * 60 * 1000);
+  console.log('  自我模型已启动 ✓');
+
   workingMemory = new WorkingMemory(storage, 50);
   console.log('  工作记忆已启动 ✓');
   console.log(`  融合存储已初始化 (${storage.getSQLite().getStatus().totalRecords} 条记忆 ✓`);
@@ -149,11 +177,6 @@ function deriveM5Strategy(decision: M3Decision): {
   else if (actions.includes('ask') && actions.includes('memorize')) { strategy_id = 'mem-ask'; desc = '确认追问'; max_len = 60; }
   else if (actions.includes('ask')) { strategy_id = 'ask-curious'; desc = '好奇追问'; max_len = 80; }
   return { strategy_id, tone, depth, max_length: max_len, description: desc };
-}
-
-// ── 安全读取 JSON 辅助 ──
-function readJSON<T>(fp: string, def: T): T {
-  try { return existsSync(fp) ? JSON.parse(fs.readFileSync(fp, 'utf-8')) : def; } catch { return def; }
 }
 
 // ════════════════════════════════════════════════════════
@@ -197,7 +220,6 @@ async function processChat(message: string): Promise<ChatResponse> {
     // 工作记忆缓冲 + 写入 SQLite
     workingMemory.push(dna, p);
     const wr = await storage.write(dna, p);
-    const ctx = await m4.orchestrate(decision);
 
     // 记录活动（巩固队列）
     consolidationQueue.recordActivity();
@@ -283,6 +305,8 @@ async function processChat(message: string): Promise<ChatResponse> {
       console.warn('[EmotionContagion] 检索失败:', err);
     }
 
+    // M4 知识融合（携带情感检索结果注入 timeline）
+    const ctx = await m4.orchestrate(decision, emotionalMemories);
 
     let reply: string;
     try { reply = await m5.orchestrate(ctx, enrichedHistory); } catch { reply = FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)]; }
@@ -312,7 +336,31 @@ async function processChat(message: string): Promise<ChatResponse> {
           m7.queue.add({ source: 'M3', content: `鸿鸣提到: ${message.substring(0, 40)}`, affected_traits: traits });
         }
       }
-    } catch { /* dream gen */
+    } catch (err) {
+      console.warn('[DreamGen] 梦境生成失败:', err);
+    }
+
+    // ── M6 自我模型演化 ──
+    try {
+      if (m6) {
+        const dimensions = dna.entity_genes.map(g => g.name).filter(Boolean);
+        const dim = dimensions[0]?.substring(0, 20) ?? '对话';
+        const direction = p.pleasure > 0 ? 'increase' : 'decrease';
+        const deltaMap = [0, 3, 8, 15];
+        const delta = deltaMap[decision.enhanced.calcium_level] ?? 3;
+        await m6.processSignal({
+          dimension: dim,
+          direction,
+          delta,
+          e1_pleasure: p.pleasure,
+          i2_intimacy: p.intimacy,
+          c1_conflict: Math.max(0, p.aggression + (1 - p.safety)),
+          calcium: decision.enhanced.calcium_level,
+          triggerEvent: message.substring(0, 40),
+        });
+      }
+    } catch (err) {
+      console.warn('[M6Evol] 自我模型演化失败:', err);
     }
 
     return {
@@ -392,6 +440,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
     // ── 重置 ──
     if (req.method === 'POST' && url.pathname === '/api/reset') {
+      // 停止所有定时器，防止泄漏
+      maintenance.stop();
+      inductionScheduler?.stop();
+      consolidationQueue?.stop();
+      if (m7Timer) { clearInterval(m7Timer); m7Timer = null; }
+      if (m6Timer) { clearInterval(m6Timer); m6Timer = null; }
       resetConversationHistory();
       await initPipeline();
       res.writeHead(200); res.end(JSON.stringify({status:'ok',message:'已重置'}));
@@ -520,9 +574,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
 
-    // ── 触发衰减维护 ──
+    // ── 触发衰减维护（含 M6 自我模型维护） ──
     if (req.method === 'POST' && url.pathname === '/api/maintenance/decay') {
       const result = storage.runDecayMaintenance();
+      m6?.maintenance();
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ status: 'ok', ...result }));
       return;
@@ -554,12 +609,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
     // ── 全模块数据 M5-M8 ──
     if (req.method === 'GET' && url.pathname === '/api/modules') {
-      // M6: 自我模型
-      const selfModel = readJSON(path.join(PROJECT_ROOT, 'data', 'self_model.json'), { traits: {}, preferences: [], boundaries: [], narrative_layers: [], version: '?' });
+      // M6: 自我模型（从 M6Orchestrator 读取）
+      const m6Model = m6?.manager?.getModel();
+      const m6Traits = m6?.manager?.getTraits() ?? getSelfModel().traits;
+      const m6Prefs = m6?.manager?.getPreferences() ?? [];
+      const m6Bounds = m6?.manager?.getBoundaries() ?? [];
+      const m6Layers = m6?.manager?.getNarrativeLayers() ?? [];
 
       // M7: 梦境（从活跃的 DreamQueue 读取）
       const m7Pending = m7?.queue?.getPending() ?? [];
-      const m7Confirmed: any[] = [];
+      const m7All = m7?.queue?.getByStatus?.('confirmed') ?? [];
       const m7Logs = m7?.tracker?.getLogs() ?? [];
 
       // M8: 年轮 — 从融合存储的地标视图读取
@@ -569,16 +628,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         m6: {
-          traits: selfModel.traits || {},
-          preferences: (selfModel.preferences || []).slice(0, 10),
-          boundaries: (selfModel.boundaries || []).slice(0, 10),
-          narrative_layers: (selfModel.narrative_layers || []).slice(0, 5),
-          version: selfModel.version || '?',
+          traits: m6Traits,
+          preferences: m6Prefs.slice(0, 10),
+          boundaries: m6Bounds.slice(0, 10),
+          narrative_layers: m6Layers.slice(0, 5),
+          version: m6Model?.version ?? '1.0',
         },
         m7: {
           pending_dreams: m7Pending.slice(0, 10),
           total_pending: m7Pending.length,
-          total_confirmed: m7Confirmed.length,
+          total_confirmed: m7All.length,
           interaction_logs: m7Logs.slice(-10),
           total_logs: m7Logs.length,
         },

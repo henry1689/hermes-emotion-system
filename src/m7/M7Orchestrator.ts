@@ -1,5 +1,6 @@
-// M7 M7Orchestrator — 空闲时段批量处理
+// M7-Dream · M7Orchestrator — 梦境空闲时段批量处理
 // Ref: docs/M7-design-v1.md §3-§6
+// @module M7-Dream
 
 import { DreamQueue } from './DreamQueue.js';
 import { DreamInternalizer } from './DreamInternalizer.js';

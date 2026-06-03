@@ -1,5 +1,6 @@
-// M7 DreamInternalizer — 疤痕检查 + 生理反馈 + 内化写入
+// M7-Dream · DreamInternalizer — 疤痕检查 + 生理反馈 + 内化写入
 // Ref: docs/M7-design-v1.md §3-§4
+// @module M7-Dream
 
 import type { M8Engine } from '../m8/M8Engine.js';
 import { DreamQueue } from './DreamQueue.js';

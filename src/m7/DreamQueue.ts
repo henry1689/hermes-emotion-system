@@ -1,5 +1,6 @@
-// M7 DreamQueue — pending_confirmation 队列管理
+// M7-Dream · DreamQueue — 梦境与人格特质演化 队列管理
 // Ref: docs/M7-design-v1.md §2-§3
+// @module M7-Dream
 
 import * as fs from 'node:fs';
 import { join, dirname } from 'node:path';

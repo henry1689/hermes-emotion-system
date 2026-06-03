@@ -170,9 +170,9 @@ export function shouldPromote(
   recallCount: number,
   effectiveStrength: number,
 ): boolean {
-  if (calciumScore >= 0.85) return true;
-  if (reinforcementAccumulator >= 2.0) return true;
-  if (recallCount >= 5 && effectiveStrength > 0.6) return true;
+  if (calciumScore >= 0.65) return true;
+  if (reinforcementAccumulator >= 1.5) return true;
+  if (recallCount >= 3 && effectiveStrength > 0.5) return true;
   return false;
 }
 

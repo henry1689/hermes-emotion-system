@@ -1,8 +1,10 @@
 /**
- * InductionScheduler — 情感归纳定时器
+ * M7-Induction · InductionScheduler — 情感归纳定时器
  *
  * 每小时运行一次，收集最近高钙化记忆。
  * 先用 LLM 生成玉瑶口吻的"今日感悟"，LLM 不可用时回退到规则摘要。
+ *
+ * @module M7-Induction
  */
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -121,6 +123,26 @@ export class InductionScheduler {
 
       const filePath = join(this.inductionPath, `induction_${now.toISOString().slice(0, 13).replace('T', '_')}.json`);
       writeFileSync(filePath, JSON.stringify(record, null, 2), 'utf-8');
+
+      // 写入 SQLite inductions 表（蓝图设计的 daily/weekly/monthly 三层归纳）
+      const validPeriods = ['hourly', 'daily', 'weekly', 'monthly'];
+      if (validPeriods.includes('hourly')) {
+        try {
+          const sqlite = this.storage.getSQLite();
+          if (sqlite && typeof sqlite.writeRaw === 'function') {
+            sqlite.writeRaw(
+              `INSERT INTO inductions (period_type, period_start, period_end, summary_text,
+               source_record_count, dominant_mood, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              'hourly', oneHourAgo.toISOString(), now.toISOString(),
+              summary, recent.length, mood, now.toISOString(),
+            );
+          }
+        } catch (err) {
+          console.warn('[Induction] SQLite 写入失败:', err);
+        }
+      }
+
       console.log(`[Induction] ✅ ${recent.length}条 · ${reflection ? 'LLM感悟' : '规则摘要'} · ${summary.substring(0, 40)}...`);
     } catch (err) {
       console.error('[Induction] 失败:', err);

@@ -3,6 +3,7 @@
 
 import type { M3Decision } from '../m3/types/perception.js';
 import type { M4Context } from './types/index.js';
+import type { ScoredMemory } from '../fusion/types/index.js';
 import type { StorageAdapter } from '../m2/StorageAdapter.js';
 import { MemoryRetriever } from './MemoryRetriever.js';
 import { FamilyGraph } from './FamilyGraph.js';
@@ -22,8 +23,9 @@ export class M4Orchestrator {
 
   /**
    * 对 M3 决策执行完整的 M4 知识融合流程
+   * @param emotionalSummaries 可选：情感检索结果，注入到 timeline 头部
    */
-  async orchestrate(decision: M3Decision): Promise<M4Context> {
+  async orchestrate(decision: M3Decision, emotionalSummaries?: ScoredMemory[]): Promise<M4Context> {
     const entities = decision.enhanced.entity_genes.map((g) => ({
       name: g.name,
       type: g.type,
@@ -50,7 +52,19 @@ export class M4Orchestrator {
       related_entity: '我',
     }));
 
-    // 5. 输出 M4Context
+    // 5. 注入情感检索结果（按时间排序后合并到 timeline 头部）
+    if (emotionalSummaries && emotionalSummaries.length > 0) {
+      const emotionalEntries = emotionalSummaries
+        .map(em => ({
+          time: em.record.created_at,
+          summary: em.record.raw_input.substring(0, 60),
+          calcium_level: em.record.calcium_level,
+        }))
+        .sort((a, b) => a.time.localeCompare(b.time));
+      memorySummary.timeline = [...emotionalEntries, ...memorySummary.timeline];
+    }
+
+    // 6. 输出 M4Context
     return {
       decision,
       memory_summary: memorySummary,
