@@ -105,6 +105,7 @@ export default function ChatPanel({ inline }: Props) {
           </div>
           <div className="chat-header-actions">
             <button className="chat-icon-btn" onClick={handleReset} title="重置对话">↺</button>
+            <button className="chat-icon-btn" onClick={() => window.location.reload()} title="刷新">⟳</button>
           </div>
         </div>
 
@@ -144,6 +145,19 @@ export default function ChatPanel({ inline }: Props) {
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </button>
+          <button className="chat-upload-btn" title="语音输入">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+          </button>
+          <button className="chat-upload-btn" title="电话">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
             </svg>
           </button>
           <input ref={inputRef} className="chat-input" type="text" placeholder="对玉瑶说点什么..."
@@ -193,6 +207,7 @@ export default function ChatPanel({ inline }: Props) {
               </div>
               <div className="chat-header-actions">
                 <button className="chat-icon-btn" onClick={handleReset} title="重置对话">↺</button>
+                <button className="chat-icon-btn" onClick={() => window.location.reload()} title="刷新">⟳</button>
                 <button className="chat-icon-btn" onClick={toggleOpen} title="关闭">✕</button>
               </div>
             </div>
@@ -221,6 +236,26 @@ export default function ChatPanel({ inline }: Props) {
               )}
             </div>
             <div className="chat-input-area">
+              <button className="chat-upload-btn" title="上传文件">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </button>
+              <button className="chat-upload-btn" title="语音输入">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              </button>
+              <button className="chat-upload-btn" title="电话">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
+              </button>
               <input ref={inputRef} className="chat-input" type="text" placeholder="对玉瑶说点什么..." autoFocus
                 value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={isTyping} />
               <button className="chat-send-btn" onClick={handleSend} disabled={!input.trim() || isTyping}>

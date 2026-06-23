@@ -143,6 +143,9 @@ function validatePath(tree: TaxonomyTree, domain: string, subcategory: string): 
  * 基于规则和分类树的确定性路由，将用户话语映射到认知拓扑坐标。
  * 不含任何LLM调用，给定相同输入始终返回相同结果。
  *
+ * 对长文本（>200 字符）自动进行段落级分段路由+聚合投票，
+ * 避免跨段落无关关键词导致误分类。
+ *
  * @param utterance - 用户输入文本
  * @param taxonomyTree - 认知分类树（可选，默认从文件加载）
  * @returns L0路由结果
@@ -166,6 +169,19 @@ export function routeL0(
     };
   }
 
+  // 长文本（>200字符）：段落级路由聚合
+  if (text.length > 200) {
+    return routeLongText(text, tree);
+  }
+
+  // 短文本：直接路由
+  return directRoute(text, tree);
+}
+
+/**
+ * 短文本直接路由（原 routeL0 核心逻辑）
+ */
+function directRoute(text: string, tree: TaxonomyTree): L0RouteResult {
   // 第一阶段：尝试关键词规则匹配
   const bestMatch = findBestMatchingRule(text);
 
@@ -182,7 +198,6 @@ export function routeL0(
   }
 
   // 第二阶段：纯情感极性探测（当没有明确domain匹配时）
-  // 尝试检测是否是纯情绪表达
   const strongNegative = ['难过', '伤心', '痛苦', '绝望', '生气', '愤怒', '崩溃', '哭'];
   const strongPositive = ['开心', '幸福', '快乐', '兴奋', '感动', '太好了'];
 
@@ -214,5 +229,44 @@ export function routeL0(
     taxonomy_version: tree.version,
     rule_id: 'misc-default-fallback',
     is_fallback: true,
+  };
+}
+
+/**
+ * 长文本段落级路由聚合。
+ * 按句号/感叹号/问号/换行分割为段落，每段独立路由，
+ * 按段落长度加权投票选出最终结果。
+ */
+function routeLongText(text: string, tree: TaxonomyTree): L0RouteResult {
+  // 分割段落
+  const segments = text.split(/[。！？\n\r]+/).filter(s => s.trim().length >= 3);
+  if (segments.length === 0) return directRoute(text, tree);
+
+  // 每段独立路由
+  const votes: Map<string, { weight: number; rule_id: string; is_fallback: boolean }> = new Map();
+
+  for (const seg of segments) {
+    const result = directRoute(seg.trim(), tree);
+    const key = result.locus_path;
+    const weight = seg.trim().length; // 段落越长，投票权重越大
+
+    if (votes.has(key)) {
+      votes.get(key)!.weight += weight;
+    } else {
+      votes.set(key, { weight, rule_id: result.rule_id, is_fallback: result.is_fallback });
+    }
+  }
+
+  // 按权重降序排列
+  const sorted = [...votes.entries()].sort((a, b) => b[1].weight - a[1].weight);
+
+  // 取权重最高的结果
+  const [locusPath, info] = sorted[0];
+
+  return {
+    locus_path: locusPath,
+    taxonomy_version: tree.version,
+    rule_id: info.rule_id,
+    is_fallback: info.is_fallback,
   };
 }

@@ -62,6 +62,11 @@ export interface EmotionalMemoryRecord {
   narrative_tag?: string;
   sensory_anchor?: string;
   scar?: MemoryScar;
+
+  /** ── 事件级 DNA（可选，单条消息的事件留空） ── */
+  event_summary?: string;
+  message_ids?: string[];
+  source_message_count?: number;
 }
 
 /** 检索查询 */

@@ -340,13 +340,19 @@ export class L3EntityAnnotator {
 
   /**
    * 对输入文本进行L3实体标注
+   * 长文本（>500字符）自动跳过无情感/话题信号的过渡段落，减少噪声。
    */
   annotate(
     text: string,
     context: string,
     selfModel: SelfModelV1
   ): L3AnnotationResult {
-    const entities = this.extractor.extract(text);
+    // 长文本优化：只从有情感信号或话题关键词的段落提取实体
+    const effectiveText = text.length > 500
+      ? this.signalParagraphs(text)
+      : text;
+
+    const entities = this.extractor.extract(effectiveText);
     const fullContext = `${text} ${context}`;
 
     const entityGenes: EntityGene[] = entities.map((entity) => ({
@@ -358,5 +364,37 @@ export class L3EntityAnnotator {
     }));
 
     return { entity_genes: entityGenes };
+  }
+
+  /**
+   * 从长文本中筛选有情感信号或话题关键词的段落，
+   * 跳过纯过渡/叙事段落，降低实体提取的噪声。
+   */
+  private signalParagraphs(text: string): string {
+    const segments = text.split(/[。！？\n\r]+/).filter(s => s.trim().length >= 3);
+    if (segments.length <= 2) return text;
+
+    // 情感词集（用于判断段落是否有信号）
+    const emotionWords = new Set([
+      '开心', '难过', '喜欢', '讨厌', '爱', '恨', '感动', '伤心',
+      '累', '烦', '忙', '好', '棒', '差', '糟', '担心', '害怕',
+      '生气', '高兴', '快乐', '幸福', '痛苦', '绝望', '焦虑', '压力',
+      '想', '要', '希望', '期待', '不想', '不要', '别',
+      // 话题关键词
+      '妈妈', '爸爸', '工作', '公司', '家', '朋友', '老板',
+      '画', '写', '做', '去', '来', '买', '吃', '喝',
+      '今天', '昨天', '明天', '刚才', '晚上', '早上',
+    ]);
+
+    // 筛选有信号的段落
+    const relevant = segments.filter(s => {
+      const trimmed = s.trim();
+      // 长段落（>20字）默认保留（可能包含重要叙事）
+      if (trimmed.length > 20) return true;
+      // 短段落必须有情感/话题词才保留
+      return [...emotionWords].some(w => trimmed.includes(w));
+    });
+
+    return relevant.join('。');
   }
 }

@@ -41,7 +41,11 @@ export class FusionStorageAdapter {
 
   // ─── 写入（接收 DNA + 24D 感知向量） ───
 
-  async write(dna: DNA, perception: Perception24D): Promise<WriteResult> {
+  async write(dna: DNA, perception: Perception24D, eventMeta?: {
+    event_summary?: string;
+    message_ids?: string[];
+    source_message_count?: number;
+  }): Promise<WriteResult> {
     this.ensureReady();
     this.seqCounter++;
 
@@ -67,6 +71,9 @@ export class FusionStorageAdapter {
       strength_updated_at: now,
       is_landmark: false,
       landmarked_at: null,
+      event_summary: eventMeta?.event_summary,
+      message_ids: eventMeta?.message_ids,
+      source_message_count: eventMeta?.source_message_count ?? 1,
     };
 
     // SQLite 写入（主存储）

@@ -129,14 +129,16 @@ export class SQLiteAdapter {
        recall_count, last_recalled_at,
        reinforcement_accumulator, effective_strength, strength_updated_at,
        is_landmark, landmarked_at, narrative_tag, sensory_anchor,
-       scar_type, scar_healed)
+       scar_type, scar_healed,
+       event_summary, message_ids, source_message_count)
       VALUES (?, ?, ?, ?,
               ?, ?,
               ?, ?, ?,
               ?, ?,
               ?, ?, ?,
               ?, ?, ?, ?,
-              ?, ?)`,
+              ?, ?,
+              ?, ?, ?)`,
       [
         record.id, record.seq_pos, record.created_at, pJson,
         record.calcium_score, record.calcium_level,
@@ -146,6 +148,9 @@ export class SQLiteAdapter {
         record.is_landmark ? 1 : 0, record.landmarked_at,
         record.narrative_tag ?? null, record.sensory_anchor ?? null,
         record.scar?.type ?? null, record.scar?.healed ? 1 : record.scar ? 0 : null,
+        record.event_summary ?? null,
+        record.message_ids ? JSON.stringify(record.message_ids) : null,
+        record.source_message_count ?? 1,
       ],
     );
 
@@ -666,6 +671,11 @@ export class SQLiteAdapter {
         healed: obj.scar_healed === 1,
         healed_at: null,
       } : undefined,
+      event_summary: obj.event_summary ?? undefined,
+      message_ids: obj.message_ids
+        ? (typeof obj.message_ids === 'string' ? JSON.parse(obj.message_ids) : obj.message_ids)
+        : undefined,
+      source_message_count: obj.source_message_count ?? 1,
     };
   }
 

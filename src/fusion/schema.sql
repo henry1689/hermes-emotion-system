@@ -33,7 +33,12 @@ CREATE TABLE IF NOT EXISTS memories (
     narrative_tag TEXT,
     sensory_anchor TEXT,
     scar_type TEXT,
-    scar_healed INTEGER
+    scar_healed INTEGER,
+
+    -- 事件级 DNA（可选）
+    event_summary TEXT,
+    message_ids TEXT,
+    source_message_count INTEGER DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_calcium ON memories(calcium_score DESC);

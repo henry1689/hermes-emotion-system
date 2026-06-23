@@ -40,7 +40,7 @@ const DATA_DIR = path.join(PROJECT_ROOT, 'data', 'webui');
 const DB_PATH = path.join(DATA_DIR, 'knowledge', 'family_graph.db');
 const HTML_PATH = path.join(__dirname, 'index.html');
 const CONV_LOG_PATH = path.join(DATA_DIR, 'conversations.json');
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // M6 自我模型（延迟初始化，在 initPipeline 中赋值）
 let m6: M6Orchestrator;
@@ -217,9 +217,10 @@ async function processChat(message: string): Promise<ChatResponse> {
     // 新 pipeline: decide → write(含感知向量)
     const decision = m3.decide(dna, { current_time: new Date().toISOString(), current_location: '深圳' });
     const p = decision.enhanced.perception;
-    // 工作记忆缓冲 + 写入 SQLite
-    workingMemory.push(dna, p);
+    // 写入存储（立即持久化，保证 seq_pos 正确）
     const wr = await storage.write(dna, p);
+    // 工作记忆缓冲（事件边界检测，用于后续聚合/摘要）
+    await workingMemory.push(dna, p);
 
     // 记录活动（巩固队列）
     consolidationQueue.recordActivity();
@@ -673,7 +674,7 @@ async function main(): Promise<void> {
   server.listen(PORT, () => {
     console.log('');
     console.log('  ╔══════════════════════════════════════╗');
-    console.log('  ║    玉瑶 · 太虚境  WebUI              ║');
+    console.log('  ║    Hermes · 玉瑶 · 太虚境           ║');
     console.log('  ║                                      ║');
     console.log(`  ║   http://localhost:${PORT}               ║`);
     console.log('  ║                                      ║');
