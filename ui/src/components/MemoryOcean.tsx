@@ -103,7 +103,7 @@ export default function MemoryOcean({ decayStats, landmarkCount, totalRecords, f
               y: [0, cr.floatY, 0],
             }}
             transition={{
-              duration: flash ? 0.6 : cr.breathDuration,
+              duration: flash ? 0.6 : cr.breathDuration * 3,
               repeat: flash ? 0 : Infinity,
               ease: 'easeInOut',
             }}

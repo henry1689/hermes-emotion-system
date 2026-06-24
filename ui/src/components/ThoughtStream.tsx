@@ -37,7 +37,7 @@ export default function ThoughtStream() {
     const el = scrollRef.current;
     if (!el || entries.length === 0) return;
     // 用 requestAnimationFrame 驱动 transform
-    const speed = 0.006; // px/frame ≈ 极慢流淌
+    const speed = 0.002; // px/frame ≈ 原速1/3
 
     const tick = () => {
       if (!el) { rafRef.current = requestAnimationFrame(tick); return; }

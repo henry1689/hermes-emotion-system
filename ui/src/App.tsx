@@ -11,9 +11,11 @@ import StatusPanel from './components/StatusPanel';
 import ThoughtStream from './components/ThoughtStream';
 import ChatPanel from './components/ChatPanel';
 import SettingsDock from './components/SettingsDock';
+import KnowledgeBase from './components/KnowledgeBase';
 import { refreshNeuralData } from './services/neuralDataService';
 import { useNeuralStore } from './store/neuralStore';
 import { useChatStore } from './store/chatStore';
+import { fetchSomaticState } from './services/somaticService';
 import './App.css';
 
 export default function App() {
@@ -24,6 +26,18 @@ export default function App() {
   // 启动时加载神经数据
   useEffect(() => {
     refreshNeuralData();
+  }, []);
+
+  // 躯体记忆轮询（每 5 秒更新粒子强度）
+  const setSomaticIntensity = useNeuralStore((s) => s.setSomaticIntensity);
+  useEffect(() => {
+    const t = setInterval(async () => {
+      try {
+        const state = await fetchSomaticState();
+        setSomaticIntensity(state.intensity);
+      } catch {}
+    }, 5000);
+    return () => clearInterval(t);
   }, []);
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -95,6 +109,9 @@ export default function App() {
           <ChatPanel inline />
         </motion.div>
       </div>
+
+      {/* 知识库浮层 */}
+      <KnowledgeBase />
 
       {/* 中心水印 */}
       <div className="center-hint">
